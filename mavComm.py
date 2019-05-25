@@ -9,12 +9,14 @@
 #
 # Author: Freddie Sherratt
 # Created: 24.01.2017
-# Last Modified: 06.01.2018
+# Last Modified: 25.05.2019
 #
 # Change List
 # 03.01.2018 - Version 1 - FS
 # 06.01.2018 - Addition of UDP socket communication class and named changed
 #              to mavComm - FS
+# 25.05.2019 - Adapted for UAS challenge - new object to fetch 6DOF data from
+#              pixhawk
 # ------------------------------------------------------------------------------
 import serial
 import select

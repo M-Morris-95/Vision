@@ -49,8 +49,6 @@ if __name__ == "__main__":
     serialReader.start()
     captureThread.start()
 
-    camObj = camera.Camera()
-
     try:
         while True:
             try:

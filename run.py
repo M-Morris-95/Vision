@@ -29,24 +29,36 @@ if __name__ == "__main__":
 # ------------------------------------------------------------------------------
 # Setup program
 # ------------------------------------------------------------------------------
+    captureQueue = queue.Queue()
+
+    # Pixhawk telemetry
     pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
                                     mavSystemID = 101,
                                     mavComponentID = 1,
                                     serialPortAddress = args.gcs[0],
                                     baudrate = int(args.gcs[1]))
 
-    # Start threads
-    serialReader = threading.Thread( target = pix.loop, name = 'serial_loop' )
-    serialReader.start()
+    serialReader = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
     pix.startRWLoop()
+
+    # Image capture
+    captureObject = camera.CaptureLoop( captureQueue )
+    captureThread = threading.Thread( target = captureObject.loop, name = 'camera capture' )
+
+    # Start threads
+    serialReader.start()
+    captureThread.start()
 
     camObj = camera.Camera()
 
     try:
         while True:
-            image = camObj.getImage()
-            sixDOF = pix.get6DOF()
-            time.sleep(1)
+            try:
+                newData = captureQueue.get_nowait()
+                print(newData[0])
+
+            except queue.Empty:
+                time.sleep(0.5)
 
     except KeyboardInterrupt:
         pass

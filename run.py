@@ -8,14 +8,14 @@ else:
     import Queue as queue
 
 import mavComm
+import camera
 
 # ------------------------------------------------------------------------------
 # Argument parsing
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-            description = 'Graphical User Interface for the 868 Emergency '
-                          'Override Connection' )
+            description = 'Vision Processing System for IMechE UAS Challenge' )
 
     parser.add_argument( '--gcs', '-G',
                          type = str,
@@ -40,11 +40,13 @@ if __name__ == "__main__":
     serialReader.start()
     pix.startRWLoop()
 
+    camObj = camera.Camera()
+
     try:
         while True:
+            image = camObj.getImage()
             sixDOF = pix.get6DOF()
-            print(sixDOF)
-            time.sleep(0.1)
+            time.sleep(1)
 
     except KeyboardInterrupt:
         pass

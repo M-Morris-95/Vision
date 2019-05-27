@@ -1,14 +1,15 @@
 import argparse
 import threading
-import sys
-import time
-if sys.version_info.major == 3:
-    import queue
-else:
-    import Queue as queue
+# import sys
+# if sys.version_info.major == 3:
+#     import queue
+# else:
+#     import Queue as queue
 
 import mavComm
 import camera
+import preprocessor_functions as preprocessor
+import Location
 
 # ------------------------------------------------------------------------------
 # Argument parsing
@@ -29,8 +30,6 @@ if __name__ == "__main__":
 # ------------------------------------------------------------------------------
 # Setup program
 # ------------------------------------------------------------------------------
-    captureQueue = queue.Queue()
-
     # Pixhawk telemetry
     pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
                                     mavSystemID = 101,
@@ -38,25 +37,41 @@ if __name__ == "__main__":
                                     serialPortAddress = args.gcs[0],
                                     baudrate = int(args.gcs[1]))
 
-    serialReader = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
+    pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
     pix.startRWLoop()
+    pixThread.start()
 
     # Image capture
-    captureObject = camera.CaptureLoop( captureQueue )
-    captureThread = threading.Thread( target = captureObject.loop, name = 'camera capture' )
+    camera = camera.Camera()
 
-    # Start threads
-    serialReader.start()
-    captureThread.start()
+    # Preprocessor
+    pre = preprocessor.preprocessor()
+
+    # Location
+    loc = Location.letterLoc()
 
     try:
         while True:
-            try:
-                newData = captureQueue.get_nowait()
-                print(newData[0])
+            image = camera.getImage()
+            sixdof = pix.get6DOF()
 
-            except queue.Empty:
-                time.sleep(0.5)
+            rawData = (sixdof, image)
+
+            success, croppedImage, center = pre.locateSquare(rawData[1])
+            if not success:
+                continue
+
+            # 6DOF, Cropped Image, Center Location
+            croppedData = (rawData[0], croppedImage, center)
+
+            coord = loc.Locate(croppedData[0], croppedData[2])
+
+            # Add classifier here
+
+            # Add sorting code
+
+            # Add transmission code here
+            print(coord)
 
     except KeyboardInterrupt:
         pass

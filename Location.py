@@ -3,7 +3,7 @@ from math import sin, cos, tan, sqrt, atan2
 
 class letterLoc:
 
-    def __init__(self, fov, Imres):
+    def __init__(self, fov = 100, Imres = (1440,920)):
         self.letterCoor = [0, 0]
         self.UTM = [0, 0]
         self.fov = fov

@@ -1,15 +1,13 @@
 import argparse
 import threading
-# import sys
-# if sys.version_info.major == 3:
-#     import queue
-# else:
-#     import Queue as queue
+import time
 
 import mavComm
 import camera
 import preprocessor_functions as preprocessor
 import Location
+
+import cv2
 
 # ------------------------------------------------------------------------------
 # Argument parsing
@@ -40,43 +38,61 @@ if __name__ == "__main__":
     pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
     pix.startRWLoop()
     pixThread.start()
+    
+    resolution = (1280, 960)
 
     # Image capture
-    camera = camera.Camera()
+    camera = camera.Camera(resolution = resolution)
 
     # Preprocessor
     pre = preprocessor.preprocessor()
 
     # Location
-    loc = Location.letterLoc()
+    loc = Location.letterLoc(Imres = resolution)
 
     try:
         while True:
             image = camera.getImage()
             sixdof = pix.get6DOF()
-
+            # print(sixdof)
+            
+            time.sleep(0.5)
+            
             rawData = (sixdof, image)
 
             success, croppedImage, center = pre.locateSquare(rawData[1])
             if not success:
                 continue
+            
+            print( center )
+            # print( croppedImage.shape )
+            
+            cv2.imshow( 'croppedImage', croppedImage )
+            cv2.waitKey(1)
 
             # 6DOF, Cropped Image, Center Location
             croppedData = (rawData[0], croppedImage, center)
 
+            
             coord = loc.Locate(croppedData[0], croppedData[2])
+            print('Coords: ', coord)
 
             # Add classifier here
 
             # Add sorting code
 
             # Add transmission code here
-            print(coord)
+            
 
     except KeyboardInterrupt:
         pass
+    
+    except Exception, e:
+        print( str(e) )
+    
 
     # Close port and finish
     pix.closeSerialPort()
+    camera.close()
 
 # ------------------------------------ EOF -------------------------------------

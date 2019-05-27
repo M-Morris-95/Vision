@@ -45,9 +45,7 @@ class preprocessor:
 
         _, contours, hierachy = cv2.findContours(hsv_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)[0:4]
-
-        image = np.nan
-        squareFound = False
+        
         for cnt in contours:
             rect = cv2.minAreaRect(cnt)
             # abs((rect[1][0]/rect[1][1])-1)<0.15 and
@@ -55,7 +53,9 @@ class preprocessor:
                 box_pts = np.int0(cv2.boxPoints(rect))
                 cv2.drawContours(frame, [box_pts], -1, (0, 255, 0), 2)
                 image = self.rot_crop(frame, rect, box_pts, self._size, self._size)
-                squareFound = True
-                break
+                
+                return True, image, rect[0]
+            
+        return False, np.nan, np.nan
 
-        return squareFound, image, rect[0]
+        

@@ -18,9 +18,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
             description = 'Vision Processing System for IMechE UAS Challenge' )
 
-    parser.add_argument( '--gcs', '-G',
+    parser.add_argument( '--pix', '-P',
                          type = str,
-                         help = 'GCS Serial port',
+                         help = 'Pixhawk Serial port',
+                         metavar = ('PORT', 'BAUD'),
+                         default = None,
+                         nargs = 2 )
+
+    parser.add_argument( '--gnd', '-G',
+                         type = str,
+                         help = 'Ground Station Serial port',
                          metavar = ('PORT', 'BAUD'),
                          default = None,
                          nargs = 2 )
@@ -34,13 +41,23 @@ if __name__ == "__main__":
     pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
                                     mavSystemID = 101,
                                     mavComponentID = 1,
-                                    serialPortAddress = args.gcs[0],
-                                    baudrate = int(args.gcs[1]))
+                                    serialPortAddress = args.pix[0],
+                                    baudrate = int(args.pix[1]))
 
     pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
     pix.startRWLoop()
     pixThread.start()
-    
+
+    # Ground Telemetry
+    gnd = mavComm.groundTelemetry( shortHand = 'GND',
+                                   mavSystemID = 102,
+                                   mavComponentID = 1,
+                                   serialPortAddress = args.gnd[0],
+                                   baudrate = int(args.gnd[1]))
+    gndThread = threading.Thread( target = gnd.loop, name = 'pixhawk telemetry' )
+    gnd.startRWLoop()
+    gndThread.start()
+
     resolution = (1280, 960)
     size = 20
 
@@ -99,7 +116,7 @@ if __name__ == "__main__":
             # Add sorting code
 
             # Add transmission code here
-            
+            gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
 
     except KeyboardInterrupt:
         pass

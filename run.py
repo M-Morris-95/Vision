@@ -6,6 +6,8 @@ import mavComm
 import camera
 import preprocessor_functions as preprocessor
 import Location
+import mainRecognition1
+from PIL import Image
 
 import cv2
 
@@ -40,44 +42,59 @@ if __name__ == "__main__":
     pixThread.start()
     
     resolution = (1280, 960)
+    size = 20
 
     # Image capture
     camera = camera.Camera(resolution = resolution)
 
     # Preprocessor
-    pre = preprocessor.preprocessor()
+    pre = preprocessor.preprocessor( size )
 
     # Location
     loc = Location.letterLoc(Imres = resolution)
+    
+    #Recognition
+    Recognition = mainRecognition1.Recognition(size)
 
     try:
         while True:
             image = camera.getImage()
             sixdof = pix.get6DOF()
-            # print(sixdof)
+            #print(sixdof)
             
             time.sleep(0.5)
+            
+            sixdof.alt = 5 #########################
+            sixdof.lat = 51.3 #########################
+            sixdof.lon = -2.3 ####################
             
             rawData = (sixdof, image)
 
             success, croppedImage, center = pre.locateSquare(rawData[1])
             if not success:
                 continue
-            
-            print( center )
-            # print( croppedImage.shape )
-            
-            cv2.imshow( 'croppedImage', croppedImage )
-            cv2.waitKey(1)
+                        
 
             # 6DOF, Cropped Image, Center Location
             croppedData = (rawData[0], croppedImage, center)
 
             
             coord = loc.Locate(croppedData[0], croppedData[2])
-            print('Coords: ', coord)
+            #print('Coords: ', coord)
 
             # Add classifier here
+            BW = cv2.cvtColor(croppedData[1], cv2.COLOR_BGR2GRAY)
+
+            Thresh = 175
+            BW[BW < Thresh] = 0
+            BW[BW >= Thresh] = 255
+            
+            cv2.imshow('BW', BW)
+            cv2.waitKey(1)
+            
+            Guess, confidence = Recognition.Identify(BW, size)            
+            
+            print("Letter = " + str(Guess) + ", Confidence = " + str(confidence) + "% , At: " + str(coord))
 
             # Add sorting code
 

@@ -37,7 +37,6 @@ class letterLoc:
         alpha = atan2(self.y, self.x)
         A = h*sin(sixdof.yaw + alpha)
         B = h*cos(sixdof.yaw + alpha)
-        print('h: ', h, 'alpha: ', alpha, 'A: ', A, 'B: ', B)
 
         self.letterCoor = utm.to_latlon(planeUTM[0]+A, planeUTM[1]+B, planeUTM[2], planeUTM[3])
 

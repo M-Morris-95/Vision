@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 class preprocessor:
-    def __init__(self, size = 28):
+    def __init__(self, size):
         self._size = size
 
     def rot_crop(self, image, pts, box, x, y):

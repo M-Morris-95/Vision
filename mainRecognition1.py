@@ -34,34 +34,48 @@ class Recognition:
 
     def Identify(self, Image, size):
         Guess = 'N/A'
+        Guess1 = 'N/A'
+        Guess2 = 'N/A'
         Image = Image/255
         #Image = imread('pic.jpg')
         #Image = Image < 127
         Temp = np.zeros((size,size))
-        scoreMax = 0   
+        scoreMax = 0
+        score1Max = 0
+        score2Max = 0 
         r = 0
         while r < 4:
             i = 0
             while i < 36:         
-                Temp = self.Templates[i+(r*36), :, :]       
+                Temp = self.Templates[i+(r*36), :, :]
                 score = 0
+                score1 = 0
+                score2 = 0
+                                
+                matrix = np.logical_xor(Temp,Image)
+                score1 = np.sum(matrix)/4
                 
                 Temp = np.invert(Temp)
-                
-                matrix = np.logical_xor(Temp,Image)
-                #matrix = np.invert(matrix)
-                score1 = np.sum(matrix)
-                
+                Temp = Temp.astype(np.int)
                 
                 result = cv2.matchTemplate(
                     Image.astype(np.float32),
                     Temp.astype(np.float32),
-                    cv2.TM_CCOEFF)
+                    cv2.TM_CCOEFF_NORMED)
                 
                 (minVal, maxVal, minLoc, maxLoc ) = cv2.minMaxLoc( result )
-                score2 = maxVal
+                score2 = maxVal*100
                 
-                score = score1 + score2
+                score = (score1 * score2)/10000
+                               
+                
+                if score1 > score1Max:
+                    score1Max = score1
+                    Guess1 = self.Letters[i]
+                    
+                if score2 > score2Max:
+                    score2Max = score2
+                    Guess2 = self.Letters[i]
 
                 if score > scoreMax:
                     scoreMax = score
@@ -73,6 +87,9 @@ class Recognition:
         confidence = scoreMax/4     
         #print("Letter = " + str(Guess))
         #print("Confidence = " + str(confidence) + "%")
+        print(Guess1, score1Max, Guess2, score2Max, Guess, scoreMax)
+        #print(self.Letters[i], score1, score2, score)
+        
         return Guess, confidence
         
 

@@ -127,6 +127,7 @@ if __name__ == "__main__":
 
     # Close port and finish
     pix.closeSerialPort()
+    gnd.closeSerialPort()
     camera.close()
 
 # ------------------------------------ EOF -------------------------------------

@@ -70,7 +70,6 @@ if __name__ == "__main__":
         print("**Pixhawk Error**")
         gnd.sendTxtMsg( "Pixhawk has not initialised" )
         print( str(e) )
-        exit(2)
 
     resolution = (1280, 960)
     size = 20

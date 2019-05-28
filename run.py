@@ -8,6 +8,7 @@ import preprocessor_functions as preprocessor
 import Location
 import mainRecognition1
 from PIL import Image
+import csv
 
 import cv2
 
@@ -73,99 +74,105 @@ if __name__ == "__main__":
 
     resolution = (1280, 960)
     size = 20
+    with open("recogntionData.csv", mode = "a") as file:
+        fileWriter = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+        fileWriter.writerow(['LatGPS', 'LonGPS', 'Alt', 'Roll', 'Pitch', 'Yaw', 'Letter', 'Conf.', 'Lat', 'Lon'])
 
-    # Image capture
-    camera = None
-    try:
-        camera = camera.Camera(resolution = resolution)
-    except Exception, e:
-        print("**Image Error**")
-        print( str(e) )
-        gnd.sendTxtMsg("Camera has not initialised")
-        pix.sendTxtMsg( "Camera has not initialised" )
+        # Image capture
+        cam = None
+        try:
+            cam = camera.Camera(resolution = resolution)
+        except Exception, e:
+            print("**Image Error**")
+            print( str(e) )
+            gnd.sendTxtMsg("Camera has not initialised")
+            pix.sendTxtMsg( "Camera has not initialised" )
+            time.sleep(2)
 
-    # Preprocessor
-    pre = None
-    try:
-        pre = preprocessor.preprocessor( size )
-    except Exception, e:
-        print("**Preprocessor Error**")
-        print( str(e) )
-        gnd.sendTxtMsg( "Preprocessor has not initialised" )
-        pix.sendTxtMsg( "Preprocessor has not initialised" )
+        # Preprocessor
+        pre = None
+        try:
+            pre = preprocessor.preprocessor( size )
+        except Exception, e:
+            print("**Preprocessor Error**")
+            print( str(e) )
+            gnd.sendTxtMsg( "Preprocessor has not initialised" )
+            pix.sendTxtMsg( "Preprocessor has not initialised" )
 
-    # Location
-    loc = None
-    try:
-        loc = Location.letterLoc(Imres = resolution)
-    except Exception, e:
-        print("**Location Error**")
-        print( str(e) )
-        gnd.sendTxtMsg( "Location has not initialised" )
-        pix.sendTxtMsg( "Location has not initialised" )
-    
-    #Recognition
-    Recognition = None
-    try:
-        Recognition = mainRecognition1.Recognition(size)
-    except Exception, e:
-        print("**Recognition Error**")
-        print( str(e) )
-        gnd.sendTxtMsg( "Recognition has not initialised" )
-        pix.sendTxtMsg( "Recognition has not initialised" )
+        # Location
+        loc = None
+        try:
+            loc = Location.letterLoc(Imres = resolution)
+        except Exception, e:
+            print("**Location Error**")
+            print( str(e) )
+            gnd.sendTxtMsg( "Location has not initialised" )
+            pix.sendTxtMsg( "Location has not initialised" )
+        
+        #Recognition
+        Recognition = None
+        try:
+            Recognition = mainRecognition1.Recognition(size)
+        except Exception, e:
+            print("**Recognition Error**")
+            print( str(e) )
+            gnd.sendTxtMsg( "Recognition has not initialised" )
+            pix.sendTxtMsg( "Recognition has not initialised" )
 
-    try:
-        while True:
-            image = camera.getImage()
-            sixdof = pix.get6DOF()
-            # print(sixdof)
+        try:
+            while True:
+                image = cam.getImage()
+                sixdof = pix.get6DOF()
+                # print(sixdof)
+                
+                time.sleep(0.5)
+#                
+#                sixdof.alt = 5 #########################
+#                sixdof.lat = 51.3 #########################
+#                sixdof.lon = -2.3 ####################
+                
+                rawData = (sixdof, image)
+
+                success, croppedImage, center = pre.locateSquare(rawData[1])
+                if not success:
+                    continue
+
+                # 6DOF, Cropped Image, Center Location
+                croppedData = (rawData[0], croppedImage, center)
+
+                coord = loc.Locate(croppedData[0], croppedData[2])
+                #print('Coords: ', coord)
+
+                # Add classifier here
+                BW = cv2.cvtColor(croppedData[1], cv2.COLOR_BGR2GRAY)
+
+                Thresh = 175
+                BW[BW < Thresh] = 0
+                BW[BW >= Thresh] = 255
+                
+                #cv2.imshow('BW', BW)
+                #cv2.waitKey(1)
+                
+                Guess, confidence = Recognition.Identify(BW, size)            
+
+                # Add sorting code
+
+                # Add transmission code here
+                gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
+                print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (Guess, confidence, coord[0], coord[1]) )
             
-            time.sleep(0.5)
-            
-#            sixdof.alt = 5 #########################
-#            sixdof.lat = 51.3 #########################
-#            sixdof.lon = -2.3 ####################
-            
-            rawData = (sixdof, image)
+                fileWriter.writerow([sixdof.lat,sixdof.lon,sixdof.alt,sixdof.roll,sixdof.pitch,sixdof.yaw,Guess,confidence,coord[0],coord[1]])
 
-            success, croppedImage, center = pre.locateSquare(rawData[1])
-            if not success:
-                continue
+        except KeyboardInterrupt:
+            pass
+        
+        except Exception, e:
+            print( str(e) )
+        
 
-            # 6DOF, Cropped Image, Center Location
-            croppedData = (rawData[0], croppedImage, center)
-
-            coord = loc.Locate(croppedData[0], croppedData[2])
-            #print('Coords: ', coord)
-
-            # Add classifier here
-            BW = cv2.cvtColor(croppedData[1], cv2.COLOR_BGR2GRAY)
-
-            Thresh = 175
-            BW[BW < Thresh] = 0
-            BW[BW >= Thresh] = 255
-            
-            #cv2.imshow('BW', BW)
-            #cv2.waitKey(1)
-            
-            Guess, confidence = Recognition.Identify(BW, size)            
-
-            # Add sorting code
-
-            # Add transmission code here
-            gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
-            print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (Guess, confidence, coord[0], coord[1]) )
-
-    except KeyboardInterrupt:
-        pass
-    
-    except Exception, e:
-        print( str(e) )
-    
-
-    # Close port and finish
-    pix.closeSerialPort()
-    gnd.closeSerialPort()
-    camera.close()
+        # Close port and finish
+        pix.closeSerialPort()
+        gnd.closeSerialPort()
+        cam.close()
 
 # ------------------------------------ EOF -------------------------------------

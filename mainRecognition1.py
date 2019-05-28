@@ -87,7 +87,7 @@ class Recognition:
         confidence = scoreMax/4     
         #print("Letter = " + str(Guess))
         #print("Confidence = " + str(confidence) + "%")
-        print(Guess1, score1Max, Guess2, score2Max, Guess, scoreMax)
+        #print(Guess1, score1Max, Guess2, score2Max, Guess, scoreMax)
         #print(self.Letters[i], score1, score2, score)
         
         return Guess, confidence

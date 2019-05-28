@@ -37,42 +37,83 @@ if __name__ == "__main__":
 # ------------------------------------------------------------------------------
 # Setup program
 # ------------------------------------------------------------------------------
-    # Pixhawk telemetry
-    pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
-                                    mavSystemID = 101,
-                                    mavComponentID = 1,
-                                    serialPortAddress = args.pix[0],
-                                    baudrate = int(args.pix[1]))
-
-    pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
-    pix.startRWLoop()
-    pixThread.start()
-
     # Ground Telemetry
-    gnd = mavComm.groundTelemetry( shortHand = 'GND',
-                                   mavSystemID = 102,
-                                   mavComponentID = 1,
-                                   serialPortAddress = args.gnd[0],
-                                   baudrate = int(args.gnd[1]))
-    gndThread = threading.Thread( target = gnd.loop, name = 'pixhawk telemetry' )
-    gnd.startRWLoop()
-    gndThread.start()
+    gnd = None
+    try:
+        gnd = mavComm.groundTelemetry( shortHand = 'GND',
+                                       mavSystemID = 102,
+                                       mavComponentID = 1,
+                                       serialPortAddress = args.gnd[0],
+                                       baudrate = int( args.gnd[1] ) )
+        gndThread = threading.Thread( target = gnd.loop, name = 'pixhawk telemetry' )
+        gnd.startRWLoop()
+        gndThread.start()
+    except Exception, e:
+        print("**Ground Error**")
+        print(str( e ))
+        exit(1)
+
+    # Pixhawk telemetry
+    pix = None
+    try:
+        pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
+                                        mavSystemID = 101,
+                                        mavComponentID = 1,
+                                        serialPortAddress = args.pix[0],
+                                        baudrate = int(args.pix[1]))
+
+        pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
+        pix.startRWLoop()
+        pixThread.start()
+    except Exception, e:
+        print("**Pixhawk Error**")
+        gnd.sendTxtMsg( "Pixhawk has not initialised" )
+        print( str(e) )
+        exit(2)
 
     resolution = (1280, 960)
     size = 20
 
     # Image capture
-    camera = camera.Camera(resolution = resolution)
+    camera = None
+    try:
+        camera = camera.Camera(resolution = resolution)
+    except Exception, e:
+        print("**Image Error**")
+        print( str(e) )
+        gnd.sendTxtMsg("Camera has not initialised")
+        pix.sendTxtMsg( "Camera has not initialised" )
 
     # Preprocessor
-    pre = preprocessor.preprocessor( size )
+    pre = None
+    try:
+        pre = preprocessor.preprocessor( size )
+    except Exception, e:
+        print("**Preprocessor Error**")
+        print( str(e) )
+        gnd.sendTxtMsg( "Preprocessor has not initialised" )
+        pix.sendTxtMsg( "Preprocessor has not initialised" )
 
     # Location
-    loc = Location.letterLoc(Imres = resolution)
+    loc = None
+    try:
+        loc = Location.letterLoc(Imres = resolution)
+    except Exception, e:
+        print("**Location Error**")
+        print( str(e) )
+        gnd.sendTxtMsg( "Location has not initialised" )
+        pix.sendTxtMsg( "Location has not initialised" )
     
     #Recognition
-    Recognition = mainRecognition1.Recognition(size)
-    
+    Recognition = None
+    try:
+        Recognition = mainRecognition1.Recognition(size)
+    except Exception, e:
+        print("**Recognition Error**")
+        print( str(e) )
+        gnd.sendTxtMsg( "Recognition has not initialised" )
+        pix.sendTxtMsg( "Recognition has not initialised" )
+
     try:
         while True:
             image = camera.getImage()
@@ -90,12 +131,10 @@ if __name__ == "__main__":
             success, croppedImage, center = pre.locateSquare(rawData[1])
             if not success:
                 continue
-                        
 
             # 6DOF, Cropped Image, Center Location
             croppedData = (rawData[0], croppedImage, center)
 
-            
             coord = loc.Locate(croppedData[0], croppedData[2])
             #print('Coords: ', coord)
 
@@ -110,16 +149,12 @@ if __name__ == "__main__":
             #cv2.waitKey(1)
             
             Guess, confidence = Recognition.Identify(BW, size)            
-            
-            print("Letter = " + str(Guess) + ", Confidence = " + str(confidence) + "% , At: " + str(coord))
 
             # Add sorting code
 
             # Add transmission code here
             gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
-            
-            #Save data to file
-            
+            print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (Guess, confidence, coord[0], coord[1]) )
 
     except KeyboardInterrupt:
         pass

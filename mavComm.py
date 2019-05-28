@@ -19,8 +19,6 @@
 #              pixhawk
 # ------------------------------------------------------------------------------
 import serial
-import select
-import socket
 import time
 import threading
 import abc
@@ -390,6 +388,10 @@ class pixhawkTelemetry( MAVAbstract ):
     def get6DOF(self):
         return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw)
 
+    def sendTxtMsg( self, text ):
+        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text )
+        self.queueOutputMsg(msg)
+
 
 # ------------------------------------------------------------------------------
 # serialMAVLink
@@ -429,7 +431,14 @@ class groundTelemetry( MAVAbstract ):
     # return void
     # --------------------------------------------------------------------------
     def _processReadMsg(self, msgList):
-        pass
+        if msgList is None:
+            return
+
+        for msg in msgList:
+            if isinstance(msg, pymavlink.MAVLink_message):
+                if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_COMMAND_LONG:
+                    print("Confidence: %f%%, Letter: %s, Lat: %f, Lon: %f " % (msg.param3*100, chr( msg.confirmation ),
+                                                             msg.param2, msg.param1))
 
     def sendTelemMsg(self, letter, confidence, lat, lon):
         letter_byte = bytearray(letter)
@@ -441,6 +450,13 @@ class groundTelemetry( MAVAbstract ):
                                                       confidence, 0, 0, 0, 0)
         self.queueOutputMsg(msg)
 
+    def sendHeartbeat( self ):
+        msg = pymavlink.MAVLink_heartbeat_message(0, 0, 0, 0, 0, 0)
+        self.queueOutputMsg(msg)
+
+    def sendTxtMsg( self, text ):
+        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text )
+        self.queueOutputMsg(msg)
 
 # ------------------------------------------------------------------------------
 # commAbstract
@@ -600,7 +616,7 @@ class serialConnect( commAbstract ):
     # --------------------------------------------------------------------------
     def dataAvailable( self ):
         try:
-            if self._serialObj.in_waiting > 0:
+            if self._serialObj.inWaiting() > 0:
                 return True
         except:
             pass
@@ -615,7 +631,8 @@ class serialConnect( commAbstract ):
     # --------------------------------------------------------------------------
     def flush( self ):
         try:
-            self._serialObj.reset_input_buffer()
+            pass
+            # self._serialObj.reset_input_buffer()
         except serial.SerialException:
             pass
 

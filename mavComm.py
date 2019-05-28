@@ -311,9 +311,9 @@ class MAVAbstract:
 # ------------------------------------------------------------------------------
 class aircraft6DOF:
     def __init__(self, lat, lon, alt, roll, pitch, yaw):
-        self.lat = lat
-        self.lon = lon
-        self.alt = alt
+        self.lat = float(lat)/1e7
+        self.lon = float(lon)/1e7
+        self.alt = float(alt)/1e3
         self.roll = roll
         self.pitch = pitch
         self.yaw = yaw

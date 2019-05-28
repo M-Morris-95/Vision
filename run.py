@@ -72,18 +72,18 @@ if __name__ == "__main__":
     
     #Recognition
     Recognition = mainRecognition1.Recognition(size)
-
+    
     try:
         while True:
             image = camera.getImage()
             sixdof = pix.get6DOF()
-            #print(sixdof)
+            # print(sixdof)
             
             time.sleep(0.5)
             
-            sixdof.alt = 5 #########################
-            sixdof.lat = 51.3 #########################
-            sixdof.lon = -2.3 ####################
+#            sixdof.alt = 5 #########################
+#            sixdof.lat = 51.3 #########################
+#            sixdof.lon = -2.3 ####################
             
             rawData = (sixdof, image)
 
@@ -106,8 +106,8 @@ if __name__ == "__main__":
             BW[BW < Thresh] = 0
             BW[BW >= Thresh] = 255
             
-            cv2.imshow('BW', BW)
-            cv2.waitKey(1)
+            #cv2.imshow('BW', BW)
+            #cv2.waitKey(1)
             
             Guess, confidence = Recognition.Identify(BW, size)            
             
@@ -117,6 +117,9 @@ if __name__ == "__main__":
 
             # Add transmission code here
             gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
+            
+            #Save data to file
+            
 
     except KeyboardInterrupt:
         pass

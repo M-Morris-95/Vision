@@ -73,6 +73,7 @@ if __name__ == "__main__":
 
     resolution = (1280, 960)
     size = 20
+    
     with open("recogntionData.csv", mode = "a") as file:
         fileWriter = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
         fileWriter.writerow(['LatGPS', 'LonGPS', 'Alt', 'Roll', 'Pitch', 'Yaw', 'Letter', 'Conf.', 'Lat', 'Lon'])
@@ -125,7 +126,7 @@ if __name__ == "__main__":
                 # print(sixdof)
                 
                 time.sleep(0.5)
-#                
+                
 #                sixdof.alt = 5 #########################
 #                sixdof.lat = 51.3 #########################
 #                sixdof.lon = -2.3 ####################
@@ -139,7 +140,11 @@ if __name__ == "__main__":
                 # 6DOF, Cropped Image, Center Location
                 croppedData = (rawData[0], croppedImage, center)
 
-                coord = loc.Locate(croppedData[0], croppedData[2])
+                if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
+                    coord = loc.Locate(croppedData[0], croppedData[2])
+                else:
+                    coord = (0, 0)
+                    
                 #print('Coords: ', coord)
 
                 # Add classifier here

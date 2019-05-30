@@ -28,7 +28,7 @@ if sys.version_info.major == 3:
 else:
     import Queue as queue
 
-import pymavlink.dialects.v10.ardupilotmega as pymavlink
+import pymavlink.dialects.v20.ardupilotmega as pymavlink
 
 # ------------------------------------------------------------------------------
 # MAVAbstract

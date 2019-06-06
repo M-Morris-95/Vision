@@ -26,7 +26,7 @@ classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
 WIDTH = 28
 HEIGHT = 28
 NUM_CLASSES = 36
-EPOCHS = 0
+EPOCHS = 1
 ROOT_PATH = os.getcwd()
 IMAGES_PATH = 'C:\\Users\\admin\\Documents\\Uni\\vision\\MyCode'
 
@@ -44,16 +44,16 @@ model = Sequential()
 model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(WIDTH, HEIGHT, 1)))
 model.add(Conv2D(32, (3, 3), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
+model.add(Dropout(rate=0.25))
 
 model.add(Conv2D(64, (3, 3), activation='relu'))
 model.add(Conv2D(64, (3, 3), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
+model.add(Dropout(rate=0.25))
 
 model.add(Flatten())
 model.add(Dense(256, activation='relu'))
-model.add(Dropout(0.5))
+model.add(Dropout(rate=0.5))
 model.add(Dense(NUM_CLASSES, activation='softmax'))
 
 #sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)

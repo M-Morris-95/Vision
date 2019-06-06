@@ -1,25 +1,34 @@
 import argparse
 import threading
-import sys
 import time
-if sys.version_info.major == 3:
-    import queue
-else:
-    import Queue as queue
 
 import mavComm
+import camera
+import preprocessor_functions as preprocessor
+import Location
+import mainRecognition1
+from PIL import Image
+import csv
+
+import cv2
 
 # ------------------------------------------------------------------------------
 # Argument parsing
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-            description = 'Graphical User Interface for the 868 Emergency '
-                          'Override Connection' )
+            description = 'Vision Processing System for IMechE UAS Challenge' )
 
-    parser.add_argument( '--gcs', '-G',
+    parser.add_argument( '--pix', '-P',
                          type = str,
-                         help = 'GCS Serial port',
+                         help = 'Pixhawk Serial port',
+                         metavar = ('PORT', 'BAUD'),
+                         default = None,
+                         nargs = 2 )
+
+    parser.add_argument( '--gnd', '-G',
+                         type = str,
+                         help = 'Ground Station Serial port',
                          metavar = ('PORT', 'BAUD'),
                          default = None,
                          nargs = 2 )
@@ -29,27 +38,145 @@ if __name__ == "__main__":
 # ------------------------------------------------------------------------------
 # Setup program
 # ------------------------------------------------------------------------------
-    pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
-                                    mavSystemID = 101,
-                                    mavComponentID = 1,
-                                    serialPortAddress = args.gcs[0],
-                                    baudrate = int(args.gcs[1]))
-
-    # Start threads
-    serialReader = threading.Thread( target = pix.loop, name = 'serial_loop' )
-    serialReader.start()
-    pix.startRWLoop()
-
+    # Ground Telemetry
+    gnd = None
     try:
-        while True:
-            sixDOF = pix.get6DOF()
-            print(sixDOF)
-            time.sleep(0.1)
+        gnd = mavComm.groundTelemetry( shortHand = 'GND',
+                                       mavSystemID = 102,
+                                       mavComponentID = 1,
+                                       serialPortAddress = args.gnd[0],
+                                       baudrate = int( args.gnd[1] ) )
+        gndThread = threading.Thread( target = gnd.loop, name = 'pixhawk telemetry' )
+        gnd.startRWLoop()
+        gndThread.start()
+    except Exception, e:
+        print("**Ground Error**")
+        print(str( e ))
+        exit(1)
 
-    except KeyboardInterrupt:
-        pass
+    # Pixhawk telemetry
+    pix = None
+    try:
+        pix = mavComm.pixhawkTelemetry( shortHand = 'PIX',
+                                        mavSystemID = 101,
+                                        mavComponentID = 1,
+                                        serialPortAddress = args.pix[0],
+                                        baudrate = int(args.pix[1]))
 
-    # Close port and finish
-    pix.closeSerialPort()
+        pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
+        pix.startRWLoop()
+        pixThread.start()
+    except Exception, e:
+        print("**Pixhawk Error**")
+        gnd.sendTxtMsg( "Pixhawk has not initialised" )
+        print( str(e) )
+
+    resolution = (1280, 960)
+    size = 20
+    
+    with open("recogntionData.csv", mode = "a") as file:
+        fileWriter = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+        fileWriter.writerow(['LatGPS', 'LonGPS', 'Alt', 'Roll', 'Pitch', 'Yaw', 'Letter', 'Conf.', 'Lat', 'Lon'])
+
+        # Image capture
+        cam = None
+        try:
+            cam = camera.Camera(resolution = resolution)
+        except Exception, e:
+            print("**Image Error**")
+            print( str(e) )
+            gnd.sendTxtMsg("Camera has not initialised")
+            pix.sendTxtMsg( "Camera has not initialised" )
+            time.sleep(2)
+
+        # Preprocessor
+        pre = None
+        try:
+            pre = preprocessor.preprocessor( size )
+        except Exception, e:
+            print("**Preprocessor Error**")
+            print( str(e) )
+            gnd.sendTxtMsg( "Preprocessor has not initialised" )
+            pix.sendTxtMsg( "Preprocessor has not initialised" )
+
+        # Location
+        loc = None
+        try:
+            loc = Location.letterLoc(Imres = resolution)
+        except Exception, e:
+            print("**Location Error**")
+            print( str(e) )
+            gnd.sendTxtMsg( "Location has not initialised" )
+            pix.sendTxtMsg( "Location has not initialised" )
+        
+        #Recognition
+        Recognition = None
+        try:
+            Recognition = mainRecognition1.Recognition(size)
+        except Exception, e:
+            print("**Recognition Error**")
+            print( str(e) )
+            gnd.sendTxtMsg( "Recognition has not initialised" )
+            pix.sendTxtMsg( "Recognition has not initialised" )
+
+        try:
+            while True:
+                image = cam.getImage()
+                sixdof = pix.get6DOF()
+                # print(sixdof)
+                
+                time.sleep(0.5)
+                
+#                sixdof.alt = 5 #########################
+#                sixdof.lat = 51.3 #########################
+#                sixdof.lon = -2.3 ####################
+                
+                rawData = (sixdof, image)
+
+                success, croppedImage, center = pre.locateSquare(rawData[1])
+                if not success:
+                    continue
+
+                # 6DOF, Cropped Image, Center Location
+                croppedData = (rawData[0], croppedImage, center)
+
+                if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
+                    coord = loc.Locate(croppedData[0], croppedData[2])
+                else:
+                    coord = (0, 0)
+                    
+                #print('Coords: ', coord)
+
+                # Add classifier here
+                BW = cv2.cvtColor(croppedData[1], cv2.COLOR_BGR2GRAY)
+
+                Thresh = 175
+                BW[BW < Thresh] = 0
+                BW[BW >= Thresh] = 255
+                
+                #cv2.imshow('BW', BW)
+                #cv2.waitKey(1)
+                
+                Guess, confidence = Recognition.Identify(BW, size)            
+
+                # Add sorting code
+
+                # Add transmission code here
+                gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
+                print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (Guess, confidence, coord[0], coord[1]) )
+            
+                fileWriter.writerow([sixdof.lat,sixdof.lon,sixdof.alt,sixdof.roll,sixdof.pitch,sixdof.yaw,Guess,confidence,coord[0],coord[1]])
+
+        except KeyboardInterrupt:
+            pass
+        
+        except Exception, e:
+            print( str(e) )
+        
+
+        # Close port and finish
+        pix.closeSerialPort()
+        gnd.closeSerialPort()
+        cam.close()
 
 # ------------------------------------ EOF -------------------------------------

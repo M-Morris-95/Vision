@@ -19,6 +19,8 @@
 #              pixhawk
 # ------------------------------------------------------------------------------
 import serial
+import select
+import socket
 import time
 import threading
 import abc
@@ -28,7 +30,7 @@ if sys.version_info.major == 3:
 else:
     import Queue as queue
 
-import pymavlink.dialects.v20.ardupilotmega as pymavlink
+import pymavlink.dialects.v10.ardupilotmega as pymavlink
 
 # ------------------------------------------------------------------------------
 # MAVAbstract
@@ -309,9 +311,9 @@ class MAVAbstract:
 # ------------------------------------------------------------------------------
 class aircraft6DOF:
     def __init__(self, lat, lon, alt, roll, pitch, yaw):
-        self.lat = float(lat)/1e7
-        self.lon = float(lon)/1e7
-        self.alt = float(alt)/1e3
+        self.lat = lat
+        self.lon = lon
+        self.alt = alt
         self.roll = roll
         self.pitch = pitch
         self.yaw = yaw
@@ -386,79 +388,8 @@ class pixhawkTelemetry( MAVAbstract ):
     # returns 6 degree of freedom object
     # --------------------------------------------------------------------------
     def get6DOF(self):
-        return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw)
+        return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw);
 
-    def sendTxtMsg( self, text ):
-        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text )
-        self.queueOutputMsg(msg)
-
-
-# ------------------------------------------------------------------------------
-# serialMAVLink
-# Abstraction layer for MAVLink communications over a serial connections
-# ------------------------------------------------------------------------------
-class groundTelemetry( MAVAbstract ):
-    # --------------------------------------------------------------------------
-    # __init__
-    # Creates and opens a serial communication channel then calls the super
-    # initializer
-    # shortHand - Name to store port under in the portDict
-    # param readQueue - queue object to write read messages to
-    # param mavSystemID - MAVLink system ID default 78
-    # param mavComponentID - MAVLink component ID
-    # param serialPortAddress - serial port address e.g. COM8
-    # param baudrate - serial baudrate
-    # param noRWSleepTime - sleep time when nothing to read or write
-    # param loopPauseSleepTime - sleep time when R/W loop is paused
-    # return void
-    # --------------------------------------------------------------------------
-    def __init__( self, shortHand, mavSystemID, mavComponentID,
-                  serialPortAddress, baudrate = 57600, noRWSleepTime = 0.1,
-                  loopPauseSleepTime = 0.5 ):
-
-        self._ser = serialConnect( serialPortAddress = serialPortAddress,
-                                   baudrate = baudrate )
-        self._ser.openPort()
-
-        super( groundTelemetry, self).__init__(
-            shortHand, mavSystemID, mavComponentID,
-            noRWSleepTime, loopPauseSleepTime )
-
-    # --------------------------------------------------------------------------
-    # _processReadMsg
-    # Overload of proccess read msg to extract telemetry information of interest
-    # param null
-    # return void
-    # --------------------------------------------------------------------------
-    def _processReadMsg(self, msgList):
-        if msgList is None:
-            return
-
-        for msg in msgList:
-            if isinstance(msg, pymavlink.MAVLink_message):
-                if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_COMMAND_LONG:
-                    print("Confidence: %f%%, Letter: %s, Lat: %f, Lon: %f " % (msg.param3*100, chr( msg.confirmation ),
-                                                             msg.param2, msg.param1))
-                elif msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_STATUSTEXT:
-                    print( msg )
-
-    def sendTelemMsg(self, letter, confidence, lat, lon):
-        letter_byte = bytearray(letter)
-        msg = pymavlink.MAVLink_command_long_message( 0, 0,
-                                                      pymavlink.MAV_CMD_USER_1,
-                                                      letter_byte[0],
-                                                      lon,
-                                                      lat,
-                                                      confidence, 0, 0, 0, 0)
-        self.queueOutputMsg(msg)
-
-    def sendHeartbeat( self ):
-        msg = pymavlink.MAVLink_heartbeat_message(0, 0, 0, 0, 0, 0)
-        self.queueOutputMsg(msg)
-
-    def sendTxtMsg( self, text ):
-        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text )
-        self.queueOutputMsg(msg)
 
 # ------------------------------------------------------------------------------
 # commAbstract
@@ -618,7 +549,7 @@ class serialConnect( commAbstract ):
     # --------------------------------------------------------------------------
     def dataAvailable( self ):
         try:
-            if self._serialObj.inWaiting() > 0:
+            if self._serialObj.in_waiting > 0:
                 return True
         except:
             pass
@@ -633,8 +564,7 @@ class serialConnect( commAbstract ):
     # --------------------------------------------------------------------------
     def flush( self ):
         try:
-            pass
-            # self._serialObj.reset_input_buffer()
+            self._serialObj.reset_input_buffer()
         except serial.SerialException:
             pass
 

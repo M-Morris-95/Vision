@@ -28,7 +28,7 @@ if sys.version_info.major == 3:
 else:
     import Queue as queue
 
-import pymavlink.dialects.v10.ardupilotmega as pymavlink
+import pymavlink.dialects.v20.ardupilotmega as pymavlink
 
 # ------------------------------------------------------------------------------
 # MAVAbstract
@@ -439,6 +439,8 @@ class groundTelemetry( MAVAbstract ):
                 if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_COMMAND_LONG:
                     print("Confidence: %f%%, Letter: %s, Lat: %f, Lon: %f " % (msg.param3*100, chr( msg.confirmation ),
                                                              msg.param2, msg.param1))
+                elif msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_STATUSTEXT:
+                    print( msg )
 
     def sendTelemMsg(self, letter, confidence, lat, lon):
         letter_byte = bytearray(letter)

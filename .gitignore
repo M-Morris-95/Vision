@@ -69,3 +69,9 @@ fabric.properties
 \.idea/
 
 *.pyc
+
+*.zip
+
+*.jpg
+
+*.hdf5

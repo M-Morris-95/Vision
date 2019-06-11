@@ -21,6 +21,7 @@
 import serial
 import time
 import threading
+import traceback
 import abc
 import sys
 if sys.version_info.major == 3:
@@ -28,7 +29,7 @@ if sys.version_info.major == 3:
 else:
     import Queue as queue
 
-import pymavlink.dialects.v20.ardupilotmega as pymavlink
+import pymavlink.dialects.v10.ardupilotmega as pymavlink
 
 # ------------------------------------------------------------------------------
 # MAVAbstract
@@ -218,7 +219,7 @@ class MAVAbstract:
                     time.sleep( self.loopPauseSleepTime )
 
         except Exception as e:
-            print( '%s' % e.message )
+            traceback.print_exc()
 
         self.closeSerialPort()
 
@@ -443,7 +444,7 @@ class groundTelemetry( MAVAbstract ):
                     print( msg )
 
     def sendTelemMsg(self, letter, confidence, lat, lon):
-        letter_byte = bytearray(letter)
+        letter_byte = bytearray(letter, encoding='utf8')
         msg = pymavlink.MAVLink_command_long_message( 0, 0,
                                                       pymavlink.MAV_CMD_USER_1,
                                                       letter_byte[0],

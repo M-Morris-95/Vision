@@ -3,14 +3,21 @@ import threading
 import time
 
 import mavComm
-import camera
+import basler_cam as camera
 import preprocessor_functions as preprocessor
 import Location
-import mainRecognition1
+#import mainRecognition1
+from load_tf_network import initialise_classifier, classify
 from PIL import Image
 import csv
-
+import numpy as np
+import traceback
 import cv2
+from sklearn.cluster import DBSCAN
+from sklearn import metrics
+from sklearn.preprocessing import StandardScaler
+
+
 
 # ------------------------------------------------------------------------------
 # Argument parsing
@@ -24,7 +31,8 @@ if __name__ == "__main__":
                          help = 'Pixhawk Serial port',
                          metavar = ('PORT', 'BAUD'),
                          default = None,
-                         nargs = 2 )
+                         nargs = 2,
+                         required = True)
 
     parser.add_argument( '--gnd', '-G',
                          type = str,
@@ -46,13 +54,13 @@ if __name__ == "__main__":
                                        mavComponentID = 1,
                                        serialPortAddress = args.gnd[0],
                                        baudrate = int( args.gnd[1] ) )
-        gndThread = threading.Thread( target = gnd.loop, name = 'pixhawk telemetry' )
+        gndThread = threading.Thread( target = gnd.loop, name = 'gcs telemetry' )
         gnd.startRWLoop()
         gndThread.start()
-    except Exception, e:
+    except Exception as e:
         print("**Ground Error**")
         print(str( e ))
-        exit(1)
+        #exit(1) # no idea what this is but it wont run with it
 
     # Pixhawk telemetry
     pix = None
@@ -66,13 +74,13 @@ if __name__ == "__main__":
         pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
         pix.startRWLoop()
         pixThread.start()
-    except Exception, e:
+    except Exception as e:
         print("**Pixhawk Error**")
         gnd.sendTxtMsg( "Pixhawk has not initialised" )
         print( str(e) )
 
-    resolution = (1280, 960)
-    size = 20
+    resolution = (1920, 1200)
+    size = 28
     
     with open("recogntionData.csv", mode = "a") as file:
         fileWriter = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
@@ -81,8 +89,8 @@ if __name__ == "__main__":
         # Image capture
         cam = None
         try:
-            cam = camera.Camera(resolution = resolution)
-        except Exception, e:
+            cam = camera.Camera()
+        except Exception as e:
             print("**Image Error**")
             print( str(e) )
             gnd.sendTxtMsg("Camera has not initialised")
@@ -93,7 +101,7 @@ if __name__ == "__main__":
         pre = None
         try:
             pre = preprocessor.preprocessor( size )
-        except Exception, e:
+        except Exception as e:
             print("**Preprocessor Error**")
             print( str(e) )
             gnd.sendTxtMsg( "Preprocessor has not initialised" )
@@ -103,7 +111,7 @@ if __name__ == "__main__":
         loc = None
         try:
             loc = Location.letterLoc(Imres = resolution)
-        except Exception, e:
+        except Exception as e:
             print("**Location Error**")
             print( str(e) )
             gnd.sendTxtMsg( "Location has not initialised" )
@@ -112,66 +120,66 @@ if __name__ == "__main__":
         #Recognition
         Recognition = None
         try:
-            Recognition = mainRecognition1.Recognition(size)
-        except Exception, e:
+            tf_sess, input_tensor_name, output_tensor = initialise_classifier()
+            #Recognition = mainRecognition1.Recognition(size)
+        except Exception as e:
             print("**Recognition Error**")
             print( str(e) )
             gnd.sendTxtMsg( "Recognition has not initialised" )
             pix.sendTxtMsg( "Recognition has not initialised" )
 
+
         try:
+            label_arr = np.array([0])
+            coord_arr = np.array([[0,0]])
+
+            print("ready to start capturing")
             while True:
-                image = cam.getImage()
+
                 sixdof = pix.get6DOF()
-                # print(sixdof)
-                
-                time.sleep(0.5)
+                image = cam.getImage()
+                #time.sleep(0.5)
                 
 #                sixdof.alt = 5 #########################
 #                sixdof.lat = 51.3 #########################
 #                sixdof.lon = -2.3 ####################
                 
                 rawData = (sixdof, image)
-
                 success, croppedImage, center = pre.locateSquare(rawData[1])
-                if not success:
-                    continue
 
-                # 6DOF, Cropped Image, Center Location
-                croppedData = (rawData[0], croppedImage, center)
+                if success:
+                    # 6DOF, Cropped Image, Center Location
+                    croppedData = (rawData[0], croppedImage, center)
 
-                if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
-                    coord = loc.Locate(croppedData[0], croppedData[2])
-                else:
-                    coord = (0, 0)
-                    
-                #print('Coords: ', coord)
+                    if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
+                        coord = loc.Locate(croppedData[0], croppedData[2])
+                    else:
+                        coord = (0, 0)
 
-                # Add classifier here
-                BW = cv2.cvtColor(croppedData[1], cv2.COLOR_BGR2GRAY)
+                    classes = np.array(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                               'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'])
+                    proba, idxs = classify(tf_sess, output_tensor, input_tensor_name, croppedImage)
+                    guess = classes[idxs[0]]
+                    confidence = proba[0][idxs[0]]
+                    # Add sorting code
 
-                Thresh = 175
-                BW[BW < Thresh] = 0
-                BW[BW >= Thresh] = 255
-                
-                #cv2.imshow('BW', BW)
-                #cv2.waitKey(1)
-                
-                Guess, confidence = Recognition.Identify(BW, size)            
+                    # transmission code
+                    print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (guess, confidence, coord[0], coord[1]))
+                    gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
 
-                # Add sorting code
 
-                # Add transmission code here
-                gnd.sendTelemMsg(Guess, confidence, coord[0], coord[1])
-                print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (Guess, confidence, coord[0], coord[1]) )
-            
-                fileWriter.writerow([sixdof.lat,sixdof.lon,sixdof.alt,sixdof.roll,sixdof.pitch,sixdof.yaw,Guess,confidence,coord[0],coord[1]])
+                    # CLUSTERING CODE
+                    #label_arr = np.append(idxs[0])
+                    #db = DBSCAN(eps = 0.0001, min_samples=10).fit(coord_arr)
+
+
+                    fileWriter.writerow([sixdof.lat,sixdof.lon,sixdof.alt,sixdof.roll,sixdof.pitch,sixdof.yaw,guess,confidence,coord[0],coord[1]])
 
         except KeyboardInterrupt:
             pass
         
-        except Exception, e:
-            print( str(e) )
+        except Exception as e:
+            traceback.print_exc()
         
 
         # Close port and finish

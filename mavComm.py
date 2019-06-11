@@ -417,6 +417,8 @@ class groundTelemetry( MAVAbstract ):
                   serialPortAddress, baudrate = 57600, noRWSleepTime = 0.1,
                   loopPauseSleepTime = 0.5 ):
 
+        self._seq = 0.0
+
         self._ser = serialConnect( serialPortAddress = serialPortAddress,
                                    baudrate = baudrate )
         self._ser.openPort()
@@ -450,8 +452,9 @@ class groundTelemetry( MAVAbstract ):
                                                       letter_byte[0],
                                                       lon,
                                                       lat,
-                                                      confidence, 0, 0, 0, 0)
+                                                      confidence, self._seq, 0, 0, 0)
         self.queueOutputMsg(msg)
+        self._seq += 1.0
 
     def sendHeartbeat( self ):
         msg = pymavlink.MAVLink_heartbeat_message(0, 0, 0, 0, 0, 0)

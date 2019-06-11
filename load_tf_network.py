@@ -13,7 +13,7 @@ def get_frozen_graph(graph_file):
         graph_def.ParseFromString(f.read())
     return graph_def
 
-def initialise_classifier(filename = './model/new_graph.pb'):
+def initialise_classifier(filename = '/home/tbd/Documents/Vision/model/new_graph.pb'):
     trt_graph = get_frozen_graph(filename)
 
     # Create session and load graph

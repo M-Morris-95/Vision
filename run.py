@@ -175,7 +175,7 @@ if __name__ == "__main__":
                     # Add sorting code
 
                     # transmission code
-                    print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (guess, confidence, coord[0], coord[1]))
+                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (gnd._seq, guess, confidence, coord[0], coord[1]))
                     gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
 
            

@@ -75,3 +75,5 @@ fabric.properties
 *.jpg
 
 *.hdf5
+
+recogntionData.csv

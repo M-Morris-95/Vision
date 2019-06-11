@@ -2,13 +2,14 @@ import argparse
 import threading
 import time
 import sys
+import mavComm
 
 if sys.version_info.major == 3:
     import queue
 else:
     import Queue as queue
 
-import mavComm
+
 
 # ------------------------------------------------------------------------------
 # Argument parsing
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
 
-    except Exception, e:
+    except Exception as e:
         print(str( e ))
 
     # Close port and finish

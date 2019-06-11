@@ -76,8 +76,3 @@ print('Test accuracy: %.1f%%' % test_accuracy)
 
 os.makedirs('./model', exist_ok=True)
 model.save("./model/model.h5")
-
-
-
-
-

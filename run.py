@@ -19,6 +19,12 @@ from sklearn.preprocessing import StandardScaler
 
 
 
+def heartBeat():
+    threading.Timer(5.0, heartBeat).start()
+    gnd.sendTxtMsg( "Aircraft Systems Operating" )
+    pix.sendTxtMsg( "Aircraft Systems Operating" )
+    
+
 # ------------------------------------------------------------------------------
 # Argument parsing
 # ------------------------------------------------------------------------------
@@ -128,7 +134,12 @@ if __name__ == "__main__":
             gnd.sendTxtMsg( "Recognition has not initialised" )
             pix.sendTxtMsg( "Recognition has not initialised" )
 
-
+        print("**Aircraft Systems Initialised**")
+        gnd.sendTxtMsg( "Aircraft Systems Initialised" )
+        pix.sendTxtMsg( "Aircraft Systems Initialised" )
+        
+        heartBeat()
+        
         try:
             label_arr = np.array([0])
             coord_arr = np.array([[0,0]])
@@ -139,10 +150,10 @@ if __name__ == "__main__":
                 sixdof = pix.get6DOF()
                 image = cam.getImage()
                 #time.sleep(0.5)
-                
-#                sixdof.alt = 5 #########################
-#                sixdof.lat = 51.3 #########################
-#                sixdof.lon = -2.3 ####################
+                                
+                #sixdof.alt = 5 #########################
+                #sixdof.lat = 51.3 #########################
+                #sixdof.lon = -2.3 ####################
                 
                 rawData = (sixdof, image)
                 success, croppedImage, center = pre.locateSquare(rawData[1])
@@ -167,7 +178,7 @@ if __name__ == "__main__":
                     print("Letter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (guess, confidence, coord[0], coord[1]))
                     gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
 
-
+           
                     # CLUSTERING CODE
                     #label_arr = np.append(idxs[0])
                     #db = DBSCAN(eps = 0.0001, min_samples=10).fit(coord_arr)

@@ -33,9 +33,9 @@ class Recognition:
 
 
     def Identify(self, Image, size):
-        Guess = 'N/A'
-        Guess1 = 'N/A'
-        Guess2 = 'N/A'
+        Guess = '-'
+        Guess1 = '-'
+        Guess2 = '-'
         Image = Image/255
         #Image = imread('pic.jpg')
         #Image = Image < 127

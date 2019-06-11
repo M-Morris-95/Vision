@@ -26,7 +26,7 @@ classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
 WIDTH = 28
 HEIGHT = 28
 NUM_CLASSES = 36
-EPOCHS = 1
+EPOCHS = 50
 ROOT_PATH = os.getcwd()
 IMAGES_PATH = 'C:\\Users\\admin\\Documents\\Uni\\vision\\MyCode'
 
@@ -56,44 +56,22 @@ model.add(Dense(256, activation='relu'))
 model.add(Dropout(rate=0.5))
 model.add(Dense(NUM_CLASSES, activation='softmax'))
 
-#sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-#model.compile(loss='categorical_crossentropy', optimizer='rms')
-
 model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 model.summary()
-checkpointer = ModelCheckpoint(filepath='Initial_CNN.hdf5',
-                               verbose=1, save_best_only=True)
 
 os.chdir(ROOT_PATH)
-#model.save('Initial_CNN.hdf5')
-model.load_weights('weights.hdf5')
-
 history = model.fit(train_data, train_labels,
           validation_data=(valid_data, valid_labels),
-          epochs=EPOCHS, batch_size=32, callbacks=[checkpointer], verbose=1)
+          epochs=EPOCHS, batch_size=32, verbose=1)
 
 predictions = [np.argmax(model.predict(np.expand_dims(tensor, axis=0))) for tensor in test_data]
-
-
 test_accuracy = 100*np.sum(np.array(predictions) == np.argmax(test_labels, axis=1))/len(predictions)
 print('Test accuracy: %.1f%%' % test_accuracy)
+# Save the h5 file to path specified.
 
+os.makedirs('./model', exist_ok=True)
+model.save("./model/model.h5")
 
-os.chdir(IMAGES_PATH)
-
-image = cv2.imread('9.jpg')
-image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-image = img_to_array(image)
-image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
-image[0, :, :, :] = (image[0, :, :, :]/128)-1
-
-# classify
-proba = model.predict(image)[0]
-idxs = np.argsort(proba)[::-1]
-
-# print top 3 classes and their probabilities. Seems totally random
-for i in idxs[0:3]:
-    print(classes[i], proba[i])
 
 
 

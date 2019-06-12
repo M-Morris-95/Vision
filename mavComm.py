@@ -390,7 +390,8 @@ class pixhawkTelemetry( MAVAbstract ):
         return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw)
 
     def sendTxtMsg( self, text ):
-        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text )
+        text_byte = bytearray(text, encoding='utf8')
+        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text_byte )
         self.queueOutputMsg(msg)
 
 
@@ -418,6 +419,7 @@ class groundTelemetry( MAVAbstract ):
                   loopPauseSleepTime = 0.5 ):
 
         self._seq = 0.0
+        self._seqHB = 0
 
         self._ser = serialConnect( serialPortAddress = serialPortAddress,
                                    baudrate = baudrate )
@@ -457,11 +459,14 @@ class groundTelemetry( MAVAbstract ):
         self._seq += 1.0
 
     def sendHeartbeat( self ):
-        msg = pymavlink.MAVLink_heartbeat_message(0, 0, 0, 0, 0, 0)
+        msg = pymavlink.MAVLink_heartbeat_message(self._seqHB, 0, 0, 0, 0, 0)
         self.queueOutputMsg(msg)
 
+        self._seqHB += 1
+
     def sendTxtMsg( self, text ):
-        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text )
+        text_byte = bytearray(text, encoding='utf8')
+        msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text_byte )
         self.queueOutputMsg(msg)
 
 # ------------------------------------------------------------------------------

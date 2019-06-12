@@ -21,10 +21,10 @@ from sklearn.preprocessing import StandardScaler
 
 def heartBeat():
     threading.Timer(5.0, heartBeat).start()
-    gnd.sendTxtMsg( "Aircraft Systems Operating" )
-    pix.sendTxtMsg( "Aircraft Systems Operating" )
+    gnd.sendHeartbeat()
+    #pix.sendTxtMsg( "Aircraft Systems Operating" )
     
-
+pic_counter = 1
 # ------------------------------------------------------------------------------
 # Argument parsing
 # ------------------------------------------------------------------------------
@@ -151,9 +151,9 @@ if __name__ == "__main__":
                 image = cam.getImage()
                 #time.sleep(0.5)
                                 
-                #sixdof.alt = 5 #########################
-                #sixdof.lat = 51.3 #########################
-                #sixdof.lon = -2.3 ####################
+                sixdof.alt = 40
+                sixdof.lat = 1
+                sixdof.lon = 1
                 
                 rawData = (sixdof, image)
                 success, croppedImage, center = pre.locateSquare(rawData[1])
@@ -173,11 +173,14 @@ if __name__ == "__main__":
                     guess = classes[idxs[0]]
                     confidence = proba[0][idxs[0]]
                     # Add sorting code
-
+                    #cv2.imwrite('picture' + str(pic_counter) + '.jpg', image)
+                    #pic_counter = pic_counter+1
                     # transmission code
-                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f" % (gnd._seq, guess, confidence, coord[0], coord[1]))
-                    gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
-
+                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f\troll: %f\tpitch: %f\tyaw: %f" % (gnd._seq, guess, confidence, coord[0], coord[1], sixdof.roll, sixdof.pitch, sixdof.yaw))
+                    try:
+                        gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
+                    except:
+                        traceback.print_exc()
            
                     # CLUSTERING CODE
                     #label_arr = np.append(idxs[0])

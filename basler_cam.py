@@ -15,9 +15,10 @@ class Camera:
         self._converter.OutputPixelFormat = pylon.PixelType_BGR8packed
         self._converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
         self._camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
-        #self._camera.ExposureAuto = 'off'
-        self._camera.ExposureTime = 10000
-        #self._camera.ExposureTime.SetValue(100.0)
+
+       # self._camera.ExposureAuto = 'Continuous'
+        self._camera.ExposureAuto = 'Off'
+        self._camera.ExposureTime = 5000
         time.sleep(2)
 
     def getImage(self):

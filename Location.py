@@ -3,7 +3,7 @@ import utm
 
 class letterLoc:
 
-    def __init__(self, fov = [radians(30.0), radians(20.0)], Imres = (1280, 960)):
+    def __init__(self, fov = [radians(67.4), radians(45.5)], Imres = (1280, 960)):
         self.letterCoor = [0, 0]
         self.UTM = [0, 0]
         self.fov = fov
@@ -44,7 +44,8 @@ class letterLoc:
 
 
     def Locate(self, sixdof, SqLoc):
-        
+        sixdof.roll = -sixdof.roll
+        sixdof.pitch = -sixdof.pitch
         self.rollAdj(sixdof, SqLoc)
         self.pitAdj(sixdof, SqLoc)
 

@@ -1,24 +1,25 @@
 import argparse
 import threading
 import time
+import traceback
+import sys
+import csv
+
+import numpy as np
+import cv2
+
+import Jetson.GPIO as GPIO
+
+# from sklearn.cluster import DBSCAN
+# from sklearn import metrics
+# from sklearn.preprocessing import StandardScaler
+
+from load_tf_network import initialise_classifier, classify
 
 import mavComm
 import basler_cam as camera
 import preprocessor_functions as preprocessor
 import Location
-from load_tf_network import initialise_classifier, classify
-from PIL import Image
-import csv
-import numpy as np
-import traceback
-import sys
-import cv2
-from sklearn.cluster import DBSCAN
-from sklearn import metrics
-from sklearn.preprocessing import StandardScaler
-
-import Jetson.GPIO as GPIO
-
 
 
 def heartBeatLoop():
@@ -30,10 +31,8 @@ def heartBeatLoop():
         GPIO.output(15, ledstate)
 
         time.sleep(3)
-    
-pic_counter = 1
-label = 1
-path = '/home/tbd/Pictures/'
+
+savePath = '/home/tbd/Pictures/'
 
 # ------------------------------------------------------------------------------
 # Argument parsing
@@ -58,9 +57,14 @@ if __name__ == "__main__":
                          nargs = 2 )
 
     parser.add_argument( '--disp', '-V',
-			help = 'Enable displaying of camera image',
-			default = None,
-			action = "store_true" )
+                         help = 'Enable displaying of camera image',
+                         default = None,
+                         action = "store_true" )
+
+    parser.add_argument('--save', '-S',
+                        help='Save images from the camera',
+                        default=None,
+                        action="store_true")
 
     args = parser.parse_args()
 
@@ -78,10 +82,9 @@ if __name__ == "__main__":
         gndThread = threading.Thread( target = gnd.loop, name = 'gcs telemetry' )
         gnd.startRWLoop()
         gndThread.start()
-    except Exception as e:
+    except Exception:
         print("**Ground Error**")
-        print(str( e ))
-        #exit(1) # no idea what this is but it wont run with it
+        traceback.print_exc(file=sys.stdout)
 
     # Pixhawk telemetry
     pix = None
@@ -95,155 +98,152 @@ if __name__ == "__main__":
         pixThread = threading.Thread( target = pix.loop, name = 'pixhawk telemetry' )
         pix.startRWLoop()
         pixThread.start()
-    except Exception as e:
+    except Exception:
         print("**Pixhawk Error**")
         gnd.sendTxtMsg( "Pixhawk has not initialised" )
-        print( str(e) )
+        traceback.print_exc(file=sys.stdout)
 
     # Setup Heartbeat LED and message
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(15, GPIO.OUT, initial=GPIO.LOW) # Heartbeat LED
-
-    GPIO.setup(16, GPIO.OUT, initial=GPIO.LOW)
+    GPIO.setup(16, GPIO.OUT, initial=GPIO.LOW) # Image LED
     ledstate = False
 
     heartBeatThread = threading.Thread(target=heartBeatLoop, name='heartBeatLoop', daemon=True).start()
 
+    # Image setup
+    resolution = (1920, 1200) # Camera image resolution
+    size = 28 # Cropped image size (28x28) pixels
 
-    # Main Loop setup
-    resolution = (1920, 1200)
-    size = 28
-    
+    # Camera
+    cam = None
+    try:
+        cam = camera.Camera(resolution=resolution)
+    except Exception:
+        print("**Image Error**")
+        traceback.print_exc(file=sys.stdout)
+        gnd.sendTxtMsg("Camera has not initialised")
+
+    # Red square detector
+    try:
+        pre = preprocessor.preprocessor(size=size)
+    except Exception:
+        print("**Preprocessor Error**")
+        traceback.print_exc(file=sys.stdout)
+        gnd.sendTxtMsg( "Preprocessor has not initialised" )
+
+    # Geo-Locator
+    try:
+        loc = Location.letterLoc(Imres=resolution)
+    except Exception:
+        print("**Location Error**")
+        traceback.print_exc(file=sys.stdout)
+        gnd.sendTxtMsg( "Location has not initialised" )
+
+    # Recognition classes
+    classes = np.array(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                        'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'])
+
+    # Setup tensor flow
+    try:
+        tf_sess, input_tensor_name, output_tensor = initialise_classifier()
+
+        classify(tf_sess, output_tensor, input_tensor_name, np.zeros([28, 28, 3], dtype=np.uint8))
+    except Exception as e:
+        print("**Recognition Error**")
+        print( str(e) )
+        gnd.sendTxtMsg( "Recognition has not initialised" )
+
+    # Ready to go
+    print("**Aircraft Systems Initialised**")
+    gnd.sendTxtMsg( "Aircraft Systems Initialised" )
+
+    GPIO.output(16, GPIO.HIGH)
+    ledstate = True
+
+    if args.disp:
+        cv2.namedWindow('title', cv2.WINDOW_NORMAL)
+
+
     with open("recogntionData.csv", mode = "a") as file:
         fileWriter = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-        fileWriter.writerow(['Date', 'Time', 'LatGPS', 'LonGPS', 'Alt', 'Roll', 'Pitch', 'Yaw', 'Letter', 'Conf.', 'Lat', 'Lon'])
+        fileWriter.writerow(['Date', 'Time',
+                             'LatGPS', 'LonGPS', 'Alt',
+                             'Roll', 'Pitch', 'Yaw',
+                             'Pixel x', 'Pixel y',
+                             'Letter', 'Conf.', 'Lat', 'Lon'])
 
-        # Image capture
-        cam = None
-        try:
-            cam = camera.Camera()
-        except Exception as e:
-            print("**Image Error**")
-            print( str(e) )
-            gnd.sendTxtMsg("Camera has not initialised")
-            pix.sendTxtMsg( "Camera has not initialised" )
-            time.sleep(2)
-
-        # Preprocessor
-        pre = None
-        try:
-            pre = preprocessor.preprocessor( size )
-        except Exception as e:
-            print("**Preprocessor Error**")
-            print( str(e) )
-            gnd.sendTxtMsg( "Preprocessor has not initialised" )
-            pix.sendTxtMsg( "Preprocessor has not initialised" )
-
-        # Location
-        loc = None
-        try:
-            loc = Location.letterLoc(Imres = resolution)
-        except Exception as e:
-            print("**Location Error**")
-            print( str(e) )
-            gnd.sendTxtMsg( "Location has not initialised" )
-            pix.sendTxtMsg( "Location has not initialised" )
-        
-        #Recognition
-        classes = np.array(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-                            'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'])
-
-        try:
-            tf_sess, input_tensor_name, output_tensor = initialise_classifier()
-
-            classify(tf_sess, output_tensor, input_tensor_name, np.zeros([28, 28, 3], dtype=np.uint8))
-        except Exception as e:
-            print("**Recognition Error**")
-            print( str(e) )
-            gnd.sendTxtMsg( "Recognition has not initialised" )
-            pix.sendTxtMsg( "Recognition has not initialised" )
-
-        print("**Aircraft Systems Initialised**")
-        gnd.sendTxtMsg( "Aircraft Systems Initialised" )
-        pix.sendTxtMsg( "Aircraft Systems Initialised" )
-
-        GPIO.output(16, GPIO.HIGH)
-        ledstate = True
-
-        if args.disp:
-            cv2.namedWindow('title', cv2.WINDOW_NORMAL)
-
-        label_arr = np.array([0])
-        coord_arr = np.array([[0,0]])
-
-        print("ready to start capturing")
         while True:
             try:
 
-                sixdof = pix.get6DOF()
                 image = cam.getImage()
+                sixdof = pix.get6DOF()
 
+                rawData = (sixdof, image)
+
+                # Check if camera is still operating correctly, if not restart it
                 if image is None:
                     try:
                         cam.close()
                         cam = camera.Camera()
-                    except:
+                    except Exception:
                         raise Exception('Camera not connected')
 
                     raise Exception('Camera Connection Restored')
 
-                #time.sleep(0.5)
-
-                #sixdof.alt = 40
-                #sixdof.lat = 1
-                #sixdof.lon = 1
-
-                rawData = (sixdof, image)
+                # Identify red squares in the image
                 success, croppedImage, rect = pre.locateSquare(rawData[1])
 
+                # Red square identified
                 if success:
                     # 6DOF, Cropped Image, Center Location
-                    #rect = centre, lengths, angle
                     croppedData = (rawData[0], croppedImage, rect[0])
 
+                    coord = (0, 0)
+                    if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
+                        try:
+                            coord = loc.Locate(croppedData[0], croppedData[2])
+                        except Exception:
+                            traceback.print_exc(file=sys.stdout)
+                            raise Exception('James Fucked It!!!')
+
+                    try:
+                        proba, idxs = classify(tf_sess, output_tensor, input_tensor_name, croppedImage)
+                    except Exception:
+                        traceback.print_exc(file=sys.stdout)
+                        raise Exception('Michael Fucked It!!!')
+
+                    guess = classes[idxs[0]]
+                    confidence = proba[0][idxs[0]]
+
+                    GPSdate = sixdof.datetime.strftime("%Y-%m-%d")
+                    GPStime = sixdof.datetime.strftime("%H-%M-%S")
+
+                    # Data logging
+                    fileWriter.writerow([GPSdate, GPStime,
+                                         croppedData[0].lat, croppedData[0].lon, croppedData[0].alt, # Aircraft location
+                                         croppedData[0].roll, croppedData[0].pitch, croppedData[0].yaw, # Aircraft attitude
+                                         croppedData[2][0], croppedData[2][1], # Pixel location in image
+                                         guess, confidence, coord[0], coord[1]]) # Geo-located letter
+
+                    # If --save argument save images
+                    if args.save:
+                       cv2.imwrite(savePath + 'pic_%3.0f_%s.jpg' % (gnd._seq, guess), image)
+
+                    # If --disp argument display image
                     if args.disp:
                         box_pts = np.int0(cv2.boxPoints(rect))
                         cv2.drawContours(image, [box_pts], 0, (255, 0, 0), 3)
                         cv2.imshow('title', image)
                         cv2.waitKey(1)
 
-                    if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
-                        coord = loc.Locate(croppedData[0], croppedData[2])
-                    else:
-                        coord = (0, 0)
-                        #continue
+                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f\troll: %f\tpitch: %f\tyaw: %f\tGPSdate: %s\tGPStime: %s" %
+                           (gnd._seq, guess, confidence, coord[0], coord[1], sixdof.roll, sixdof.pitch, sixdof.yaw, GPSdate, GPStime))
 
-                    proba, idxs = classify(tf_sess, output_tensor, input_tensor_name, croppedImage)
-                    guess = classes[idxs[0]]
-                    confidence = proba[0][idxs[0]]
-                    # Add sorting code
-                    #if pic_counter >= 10:
-                    #    cv2.imwrite(path + 'picture' + str(label) + '.jpg', image)
-                    #    label = label + 1
-                    #    pic_counter = 0
-                    #pic_counter = pic_counter+1
-                    # transmission code
+                    # Report to ground
+                    gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
 
-                    GPSdate = sixdof.datetime.strftime("%Y-%m-%d")
-                    GPStime = sixdof.datetime.strftime("%H-%M")
-
-                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f\troll: %f\tpitch: %f\tyaw: %f\tGPSdate: %s\tGPStime: %s" % (gnd._seq, guess, confidence, coord[0], coord[1], sixdof.roll, sixdof.pitch, sixdof.yaw, GPSdate, GPStime))
-                    try:
-                        gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
-                    except:
-                        traceback.print_exc(file=sys.stdout)
-
-                    # CLUSTERING CODE
-                    #label_arr = np.append(idxs[0])
-                    #db = DBSCAN(eps = 0.0001, min_samples=10).fit(coord_arr)
-
-                    fileWriter.writerow([GPSdate, GPStime,sixdof.lat,sixdof.lon,sixdof.alt,sixdof.roll,sixdof.pitch,sixdof.yaw,guess,confidence,coord[0],coord[1]])
-
+                    # Heartbeat LED
                     ledstate = not ledstate
                     GPIO.output(16, ledstate)
 
@@ -259,9 +259,8 @@ if __name__ == "__main__":
                 traceback.print_exc(file=sys.stdout)
                 time.sleep(1)
 
+        # Cleanup
         GPIO.cleanup()
-
-        # Close port and finish
         pix.closeSerialPort()
         gnd.closeSerialPort()
         cam.close()

@@ -5,6 +5,7 @@ import basler_cam as camera
 import preprocessor_functions as preprocessor
 import mainRecognition1
 import cv2
+import numpy as np
 from load_tf_network import initialise_classifier, classify
 
 # ------------------------------------------------------------------------------
@@ -37,14 +38,14 @@ if __name__ == "__main__":
         while True:
             start = time.time()
             image = cam.getImage()
-            success, frame, center = pre.locateSquare(image)
-            if success:
-                #cv2.drawContours(image,[box],0,(0,255,0),2)
-                proba, idxs = classify(tf_sess, output_tensor, input_tensor_name, frame)
-                #for i in idxs[0:3]:
-                i = idxs[0]
-                print(classes[i], proba[0][i], end = ' ' )
-                print(1/(time.time()-start))
+            success, frame, box_pts = pre.locate4Squares(image)
+            for i in range(len(success)):
+                if success[i]:
+                    cv2.drawContours(image,[box_pts[i,:,:]],0,(0,255,0),2)
+                    proba, idxs = classify(tf_sess, output_tensor, input_tensor_name, frame[i,:,:,:])
+                    i = idxs[0]
+                    print(classes[i], proba[0][i], end = ' ' )
+                    print(1/(time.time()-start))
             cv2.imshow('title', image)
             cv2.waitKey(1)
 

@@ -16,13 +16,14 @@ class Camera:
         self._converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
         self._camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
 
-       # self._camera.ExposureAuto = 'Continuous'
+        #self._camera.ExposureAuto = 'Continuous'
         self._camera.ExposureAuto = 'Off'
         self._camera.ExposureTime = 5000
         time.sleep(2)
 
     def getImage(self):
         flag = 0
+        img = None
         try:
             while not flag:
                 result = self._camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)

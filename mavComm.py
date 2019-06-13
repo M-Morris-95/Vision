@@ -24,6 +24,7 @@ import threading
 import traceback
 import abc
 import sys
+from datetime import datetime as dt
 if sys.version_info.major == 3:
     import queue
 else:
@@ -219,7 +220,7 @@ class MAVAbstract:
                     time.sleep( self.loopPauseSleepTime )
 
         except Exception as e:
-            traceback.print_exc()
+            traceback.print_exc(file=sys.stdout)
 
         self.closeSerialPort()
 
@@ -309,17 +310,18 @@ class MAVAbstract:
 # Storage object for mavlink 6 degree of freedom data
 # ------------------------------------------------------------------------------
 class aircraft6DOF:
-    def __init__(self, lat, lon, alt, roll, pitch, yaw):
+    def __init__(self, lat, lon, alt, roll, pitch, yaw, datetime):
         self.lat = float(lat)/1e7
         self.lon = float(lon)/1e7
         self.alt = float(alt)/1e3
         self.roll = roll
         self.pitch = pitch
         self.yaw = yaw
+        self.datetime = datetime
 
     def __str__(self):
-        return "Lat %.3f, Lon %.3f, Alt %.3f, Roll %.3f, Pitch %.3f, Yaw %.3f" % \
-               (self.lat, self.lon, self.alt, self.roll, self.pitch, self.yaw)
+        return "Lat %.3f, Lon %.3f, Alt %.3f, Roll %.3f, Pitch %.3f, Yaw %.3f, datetime %.3f" % \
+               (self.lat, self.lon, self.alt, self.roll, self.pitch, self.yaw, self.datetime)
 
 # ------------------------------------------------------------------------------
 # serialMAVLink
@@ -351,6 +353,8 @@ class pixhawkTelemetry( MAVAbstract ):
         self._lon = 0
         self._alt = 0
 
+        self._datetime = dt.fromtimestamp(0)
+
         self._ser = serialConnect( serialPortAddress = serialPortAddress,
                                    baudrate = baudrate )
         self._ser.openPort()
@@ -379,6 +383,8 @@ class pixhawkTelemetry( MAVAbstract ):
                     self._lat = msg.lat
                     self._lon = msg.lon
                     self._alt = msg.relative_alt
+                if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_SYSTEM_TIME:
+                    self._datetime = dt.fromtimestamp((int)(msg.time_unix_usec/1000000))
 
     # --------------------------------------------------------------------------
     # get6DOF (getter)
@@ -387,7 +393,7 @@ class pixhawkTelemetry( MAVAbstract ):
     # returns 6 degree of freedom object
     # --------------------------------------------------------------------------
     def get6DOF(self):
-        return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw)
+        return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw, self._datetime)
 
     def sendTxtMsg( self, text ):
         text_byte = bytearray(text, encoding='utf8')
@@ -463,6 +469,8 @@ class groundTelemetry( MAVAbstract ):
         self.queueOutputMsg(msg)
 
         self._seqHB += 1
+        if self._seqHB > 255:
+            self._seqHB = 0
 
     def sendTxtMsg( self, text ):
         text_byte = bytearray(text, encoding='utf8')

@@ -186,6 +186,10 @@ if __name__ == "__main__":
                     try:
                         cam.close()
                         cam = camera.Camera()
+
+                    except KeyboardInterrupt:
+                        raise KeyboardInterrupt
+
                     except Exception:
                         raise Exception('Camera not connected')
 

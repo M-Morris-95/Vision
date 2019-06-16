@@ -201,30 +201,53 @@ class MAVAbstract:
     # param null
     # return void
     # --------------------------------------------------------------------------
-    def loop( self ):
-        try:
-            while not self._intentionallyExit:
+    def loop(self):
+
+        while not self._intentionallyExit:
+            try:
                 if self._loopRunning:
 
                     rMsg = self._readMsg()
                     wMsg = self._getWriteMsg()
 
                     if rMsg is None and wMsg is None:
-                        time.sleep( self.noRWSleepTime )
+                        time.sleep( self.noRWSleepTime)
 
                     else:
-                        self._processReadMsg( rMsg )
-                        self._writeMsg( wMsg )
+                        self._processReadMsg(rMsg)
+                        self._writeMsg(wMsg)
 
                 else:
-                    time.sleep( self.loopPauseSleepTime )
+                    time.sleep(self.loopPauseSleepTime)
 
-        except Exception as e:
-            traceback.print_exc(file=sys.stdout)
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+
+            except Exception:
+                traceback.print_exc(file=sys.stdout)
+                self.restartConnection()
 
         self.closeSerialPort()
 
-        print('Serial Thread %s Closed' % self._name )
+        print('Serial Thread %s Closed' % self._name)
+
+    # --------------------------------------------------------------------------
+    # restartConnection
+    # Close and reopen the serial port
+    # param null
+    # return void
+    # --------------------------------------------------------------------------
+    def restartConnection(self):
+        try:
+            self._ser.closePort()
+            time.sleep(1)
+            self._ser.openPort()
+
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+
+        except Exception:
+            pass
 
 
     # --------------------------------------------------------------------------

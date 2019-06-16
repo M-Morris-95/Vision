@@ -32,6 +32,8 @@ else:
 
 import pymavlink.dialects.v10.ardupilotmega as pymavlink
 
+import numpy as np
+
 # ------------------------------------------------------------------------------
 # MAVAbstract
 # Abstraction class for MAVLink serial communications, implements loop for
@@ -221,7 +223,7 @@ class MAVAbstract:
                     time.sleep(self.loopPauseSleepTime)
 
             except KeyboardInterrupt:
-                raise KeyboardInterrupt
+                break
 
             except Exception:
                 traceback.print_exc(file=sys.stdout)
@@ -450,13 +452,19 @@ class groundTelemetry( MAVAbstract ):
         self._seq = 0.0
         self._seqHB = 0
 
+        self._numClusters = 4
+
+        self._geolocLat = np.zeros(self._numClusters, dtype=np.float)
+        self._geolocLon = np.zeros(self._numClusters, dtype=np.float)
+        self._geolocChar = np.zeros(self._numClusters, dtype=np.uint8)
+        self._geolocConf = np.zeros(self._numClusters, dtype=np.float)
+
         self._ser = serialConnect( serialPortAddress = serialPortAddress,
                                    baudrate = baudrate )
         self._ser.openPort()
 
-        super( groundTelemetry, self).__init__(
-            shortHand, mavSystemID, mavComponentID,
-            noRWSleepTime, loopPauseSleepTime )
+        super( groundTelemetry, self).__init__( shortHand, mavSystemID, mavComponentID, noRWSleepTime,
+                                                loopPauseSleepTime )
 
     # --------------------------------------------------------------------------
     # _processReadMsg
@@ -471,8 +479,31 @@ class groundTelemetry( MAVAbstract ):
         for msg in msgList:
             if isinstance(msg, pymavlink.MAVLink_message):
                 if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_COMMAND_LONG:
-                    print("Confidence: %f%%, Letter: %s, Lat: %f, Lon: %f " % (msg.param3*100, chr( msg.confirmation ),
-                                                             msg.param2, msg.param1))
+
+                    command = msg.command
+                    if not command == pymavlink.MAV_CMD_WAYPOINT_USER_1:
+                        continue
+
+                    id = int(msg.param2)
+
+                    if id >= self._numClusters:
+                        continue
+
+                    # Update latest positions
+                    self._geolocChar[id] = msg.confirmation
+                    self._geolocConf[id] = msg.param1
+
+                    self._geolocLat[id] = msg.param5
+                    self._geolocLon[id] = msg.param6
+
+                    # Display on GUI
+                    print('#####################')
+                    for i in range(self._numClusters):
+                        print("Id: %d\tChar: %s\tLat: %.10f\tLon: %.10f\tConf:%.3f%%" % (i, self._geolocChar[i],
+                                                                         self._geolocLat[i],
+                                                                         self._geolocLon[i],
+                                                                         self._geolocConf[i]))
+
                 elif msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_STATUSTEXT:
                     print( msg )
 
@@ -499,6 +530,24 @@ class groundTelemetry( MAVAbstract ):
         text_byte = bytearray(text, encoding='utf8')
         msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text_byte )
         self.queueOutputMsg(msg)
+
+    def updateLocation(self, id, lon, lat, letter, confidence):
+        letter_byte = bytearray(letter, encoding='utf8')
+
+        self._geolocChar[id] = letter_byte[0]
+        self._geolocConf[id] = confidence
+        self._geolocLat[id] = lat
+        self._geolocLon[id] = lon
+
+    def sendClusterMsg(self):
+        for i in range(self._numClusters):
+            msg = pymavlink.MAVLink_command_long_message(0, 0,
+                                                         pymavlink.MAV_CMD_WAYPOINT_USER_1,
+                                                         self._geolocChar[i],
+                                                         self._geolocConf[i], i, 0, 0,
+                                                         self._geolocLon[i], self._geolocLat[i], 0)
+            self.queueOutputMsg(msg)
+
 
 # ------------------------------------------------------------------------------
 # commAbstract
@@ -584,6 +633,7 @@ class serialConnect( commAbstract ):
 
         try:
             self._serialObj.open()
+
         except Exception as e:
             raise e
 

@@ -455,7 +455,7 @@ class groundTelemetry( MAVAbstract ):
         self._seq = 0.0
         self._seqHB = 0
 
-        self._clusters = np.zeros((1, 6), dtype=float)
+        self._clusters = np.zeros((6, 6), dtype=float)
 
         self._satcount = 0
 
@@ -482,37 +482,40 @@ class groundTelemetry( MAVAbstract ):
                 if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_COMMAND_LONG:
 
                     command = msg.command
-                    if not command == pymavlink.MAV_CMD_WAYPOINT_USER_1:
-                        continue
+                    if command == pymavlink.MAV_CMD_WAYPOINT_USER_1:
 
-                    id = int(msg.param2)
+                        id = int(msg.param1)
 
-                    # if id >= self._numClusters:
-                    #     continue
-                    #
-                    # # Update latest positions
-                    # self._geolocChar[id] = msg.confirmation
-                    # self._geolocConf[id] = msg.param1
-                    #
-                    # self._geolocStd[id] = msg.param3
-                    # self._geolocNumPts[id] = msg.param4
-                    #
-                    # self._geolocLat[id] = msg.param5
-                    # self._geolocLon[id] = msg.param6
-                    #
-                    # # Display on GUI
-                    # print('#---------------------------------------------------------------------------------------#')
-                    # for i in range(self._numClusters):
-                    #     print("Id: %d\tChar: %s\tLat: %.10f\tLon: %.10f\tConf:%.3f%%\tStdev: %.3f\tnum %.0f" % (i,
-                    #                                                                             self._geolocChar[i],
-                    #                                                                             self._geolocLat[i],
-                    #                                                                             self._geolocLon[i],
-                    #                                                                             self._geolocConf[i],
-                    #                                                                             self._geolocStd[i],
-                    #                                                                             self._geolocNumPts[i]))
+                        self._clusters[id, :] = np.asarray([msg.param2, msg.param3, msg.param4, msg.param5,
+                                                            msg.param6, msg.param7])
+
+                        classes = np.array(
+                            ['O', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                             'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'])
+
+                        print('#---------------------------------------------------------------------------------------#')
+                        for i in range(len(self._clusters)):
+                            # lat lon std confidence letter len
+                            print("CLUSTER: Id: %d\tChar: %s\tLat: %.10f\tLon: %.10f\tConf:%.1f%%\tStdev: %.3f\tnum %.0f" % (i,
+                                                                                          classes[int(self._clusters[i, 4])],
+                                                                                                self._clusters[i, 0],
+                                                                                                self._clusters[i, 1],
+                                                                                                self._clusters[i, 3]*100,
+                                                                                                self._clusters[i, 2],
+                                                                                                self._clusters[i, 5]))
+
+                    elif command == pymavlink.MAV_CMD_USER_1:
+                        print(
+                            '#---------------------------------------------------------------------------------------#')
+                        print("LETTER: Char: %s\tLat: %.10f\tLon: %.10f\tConf: %.1f%%" % (chr(msg.confirmation), msg.param1, msg.param2, msg.param3*100) )
 
                 elif msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_STATUSTEXT:
-                    print( msg )
+                    print('#---------------------------------------------------------------------------------------#')
+                    print( "STATUS: %s" % msg.text )
+
+                elif msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_HEARTBEAT:
+                    print('#---------------------------------------------------------------------------------------#')
+                    print("HEARTBEAT: Seq: %d\tSat Count: %d" % (msg.type, msg.autopilot))
 
     def setSatCount(self, satcount):
         self._satcount = satcount

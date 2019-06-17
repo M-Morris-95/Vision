@@ -18,7 +18,7 @@ class Camera:
 
         #self._camera.ExposureAuto = 'Continuous'
         self._camera.ExposureAuto = 'Off'
-        self._camera.ExposureTime = 5000
+        self._camera.ExposureTime = 10000#5000
         time.sleep(2)
 
     def getImage(self):

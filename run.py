@@ -10,12 +10,8 @@ import cv2
 
 import Jetson.GPIO as GPIO
 
-# from sklearn.cluster import DBSCAN
-# from sklearn import metrics
-# from sklearn.preprocessing import StandardScaler
-
 from load_tf_network import initialise_classifier, classify
-
+from clustering import clustering
 import mavComm
 import basler_cam as camera
 import preprocessor_functions as preprocessor
@@ -156,7 +152,7 @@ if __name__ == "__main__":
 
     # Ready to go
     print("**Aircraft Systems Initialised**")
-    gnd.sendTxtMsg( "Aircraft Systems Initialised" )
+    # gnd.sendTxtMsg( "Aircraft Systems Initialised" )
 
     GPIO.output(16, GPIO.HIGH)
     ledstate = True
@@ -167,17 +163,20 @@ if __name__ == "__main__":
 
     with open("recogntionData.csv", mode = "a") as file:
         fileWriter = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-        fileWriter.writerow(['Date', 'Time',
+        fileWriter.writerow(['Seq', 'Date', 'Time',
                              'LatGPS', 'LonGPS', 'Alt',
                              'Roll', 'Pitch', 'Yaw',
                              'Pixel x', 'Pixel y',
                              'Letter', 'Conf.', 'Lat', 'Lon'])
-
+        unscaled_data = np.array([[0, 0, 0, 0]])
+        start = time.time()
         while True:
             try:
 
                 image = cam.getImage()
                 sixdof = pix.get6DOF()
+
+                gnd.setSatCount(sixdof.satcount)
 
                 rawData = (sixdof, image)
 
@@ -204,7 +203,7 @@ if __name__ == "__main__":
                     croppedData = (rawData[0], croppedImage, rect[0])
 
                     coord = (0, 0)
-                    if (croppedData[0].lat and croppedData[0].lon != 0) and (croppedData[0].alt > 0):
+                    if (croppedData[0].lat and croppedData[0].lon != 0):# and (croppedData[0].alt > 0):
                         try:
                             coord = loc.Locate(croppedData[0], croppedData[2])
                         except Exception:
@@ -224,11 +223,12 @@ if __name__ == "__main__":
                     GPStime = sixdof.datetime.strftime("%H-%M-%S")
 
                     # Data logging
-                    fileWriter.writerow([GPSdate, GPStime,
+                    fileWriter.writerow([gnd._seq, GPSdate, GPStime,
                                          croppedData[0].lat, croppedData[0].lon, croppedData[0].alt, # Aircraft location
                                          croppedData[0].roll, croppedData[0].pitch, croppedData[0].yaw, # Aircraft attitude
                                          croppedData[2][0], croppedData[2][1], # Pixel location in image
                                          guess, confidence, coord[0], coord[1]]) # Geo-located letter
+                    file.flush()
 
                     # If --save argument save images
                     if args.save:
@@ -241,8 +241,8 @@ if __name__ == "__main__":
                         cv2.imshow('title', image)
                         cv2.waitKey(1)
 
-                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f\troll: %f\tpitch: %f\tyaw: %f\tGPSdate: %s\tGPStime: %s" %
-                           (gnd._seq, guess, confidence, coord[0], coord[1], sixdof.roll, sixdof.pitch, sixdof.yaw, GPSdate, GPStime))
+                    print("Seq: %.0f\tLetter: %s\tConfidence: %f\tLat: %f\tLon: %f\troll: %f\tpitch: %f\tyaw: %f\tGPSdate: %s\tGPStime: %s\tSatCount: %.0f" %
+                           (gnd._seq, guess, confidence, coord[0], coord[1], sixdof.roll, sixdof.pitch, sixdof.yaw, GPSdate, GPStime, sixdof.satcount))
 
                     # Report to ground
                     gnd.sendTelemMsg(guess, confidence, coord[0], coord[1])
@@ -251,9 +251,22 @@ if __name__ == "__main__":
                     ledstate = not ledstate
                     GPIO.output(16, ledstate)
 
+                    unscaled_data = np.append(unscaled_data,
+                                      [[croppedData[0].lat, croppedData[0].lon, idxs[0], confidence]],
+                                      axis=0)
+
+                    cluster_guesses = clustering(unscaled_data)
+                    gnd.updateClusters(cluster_guesses)
+
+
                 elif args.disp:
                     cv2.imshow('title', image)
                     cv2.waitKey(1)
+
+                if time.time() - start >= 3:
+                    gnd.printClusters()
+                    start = time.time()
+                    print(gnd._clusters)
 
             except KeyboardInterrupt:
                 break

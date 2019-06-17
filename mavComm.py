@@ -335,7 +335,7 @@ class MAVAbstract:
 # Storage object for mavlink 6 degree of freedom data
 # ------------------------------------------------------------------------------
 class aircraft6DOF:
-    def __init__(self, lat, lon, alt, roll, pitch, yaw, datetime):
+    def __init__(self, lat, lon, alt, roll, pitch, yaw, datetime, satcount):
         self.lat = float(lat)/1e7
         self.lon = float(lon)/1e7
         self.alt = float(alt)/1e3
@@ -343,10 +343,11 @@ class aircraft6DOF:
         self.pitch = pitch
         self.yaw = yaw
         self.datetime = datetime
+        self.satcount = satcount
 
     def __str__(self):
-        return "Lat %.3f, Lon %.3f, Alt %.3f, Roll %.3f, Pitch %.3f, Yaw %.3f, datetime %.3f" % \
-               (self.lat, self.lon, self.alt, self.roll, self.pitch, self.yaw, self.datetime)
+        return "Lat %.3f, Lon %.3f, Alt %.3f, Roll %.3f, Pitch %.3f, Yaw %.3f, datetime %.3f, satcount %.3f" % \
+               (self.lat, self.lon, self.alt, self.roll, self.pitch, self.yaw, self.datetime, self.satcount)
 
 # ------------------------------------------------------------------------------
 # serialMAVLink
@@ -379,7 +380,7 @@ class pixhawkTelemetry( MAVAbstract ):
         self._alt = 0
 
         self._datetime = dt.fromtimestamp(0)
-
+        self._satcount = 0
         self._ser = serialConnect( serialPortAddress = serialPortAddress,
                                    baudrate = baudrate )
         self._ser.openPort()
@@ -408,6 +409,8 @@ class pixhawkTelemetry( MAVAbstract ):
                     self._lat = msg.lat
                     self._lon = msg.lon
                     self._alt = msg.relative_alt
+                if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_GPS_RAW_INT:
+                    self._satcount = msg.satellites_visible
                 if msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_SYSTEM_TIME:
                     self._datetime = dt.fromtimestamp((int)(msg.time_unix_usec/1000000))
 
@@ -418,7 +421,7 @@ class pixhawkTelemetry( MAVAbstract ):
     # returns 6 degree of freedom object
     # --------------------------------------------------------------------------
     def get6DOF(self):
-        return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw, self._datetime)
+        return aircraft6DOF(self._lat, self._lon, self._alt, self._roll, self._pitch, self._yaw, self._datetime, self._satcount)
 
     def sendTxtMsg( self, text ):
         text_byte = bytearray(text, encoding='utf8')
@@ -447,20 +450,15 @@ class groundTelemetry( MAVAbstract ):
     # --------------------------------------------------------------------------
     def __init__( self, shortHand, mavSystemID, mavComponentID,
                   serialPortAddress, baudrate = 57600, noRWSleepTime = 0.1,
-                  loopPauseSleepTime = 0.5 ):
+                  loopPauseSleepTime = 0.5, numClusters = 6 ):
 
         self._seq = 0.0
         self._seqHB = 0
 
-        self._numClusters = 4
+        self._clusters = np.zeros((1, 6), dtype=float)
 
-        self._geolocLat = np.zeros(self._numClusters, dtype=np.float)
-        self._geolocLon = np.zeros(self._numClusters, dtype=np.float)
-        self._geolocChar = np.zeros(self._numClusters, dtype=np.uint8)
-        self._geolocConf = np.zeros(self._numClusters, dtype=np.float)
+        self._satcount = 0
 
-        self._geolocStd = np.zeros(self._numClusters, dtype=np.float)
-        self._geolocNumPts = np.zeros(self._numClusters, dtype=np.float)
 
         self._ser = serialConnect( serialPortAddress = serialPortAddress,
                                    baudrate = baudrate )
@@ -489,32 +487,35 @@ class groundTelemetry( MAVAbstract ):
 
                     id = int(msg.param2)
 
-                    if id >= self._numClusters:
-                        continue
-
-                    # Update latest positions
-                    self._geolocChar[id] = msg.confirmation
-                    self._geolocConf[id] = msg.param1
-
-                    self._geolocStd[id] = msg.param3
-                    self._geolocNumPts[id] = msg.param4
-
-                    self._geolocLat[id] = msg.param5
-                    self._geolocLon[id] = msg.param6
-
-                    # Display on GUI
-                    print('#---------------------------------------------------------------------------------------#')
-                    for i in range(self._numClusters):
-                        print("Id: %d\tChar: %s\tLat: %.10f\tLon: %.10f\tConf:%.3f%%\tStdev: %.3f\tnum %.0f" % (i,
-                                                                                                self._geolocChar[i],
-                                                                                                self._geolocLat[i],
-                                                                                                self._geolocLon[i],
-                                                                                                self._geolocConf[i],
-                                                                                                self._geolocStd[i],
-                                                                                                self._geolocNumPts[i]))
+                    # if id >= self._numClusters:
+                    #     continue
+                    #
+                    # # Update latest positions
+                    # self._geolocChar[id] = msg.confirmation
+                    # self._geolocConf[id] = msg.param1
+                    #
+                    # self._geolocStd[id] = msg.param3
+                    # self._geolocNumPts[id] = msg.param4
+                    #
+                    # self._geolocLat[id] = msg.param5
+                    # self._geolocLon[id] = msg.param6
+                    #
+                    # # Display on GUI
+                    # print('#---------------------------------------------------------------------------------------#')
+                    # for i in range(self._numClusters):
+                    #     print("Id: %d\tChar: %s\tLat: %.10f\tLon: %.10f\tConf:%.3f%%\tStdev: %.3f\tnum %.0f" % (i,
+                    #                                                                             self._geolocChar[i],
+                    #                                                                             self._geolocLat[i],
+                    #                                                                             self._geolocLon[i],
+                    #                                                                             self._geolocConf[i],
+                    #                                                                             self._geolocStd[i],
+                    #                                                                             self._geolocNumPts[i]))
 
                 elif msg.get_msgId() == pymavlink.MAVLINK_MSG_ID_STATUSTEXT:
                     print( msg )
+
+    def setSatCount(self, satcount):
+        self._satcount = satcount
 
     def sendTelemMsg(self, letter, confidence, lat, lon):
         letter_byte = bytearray(letter, encoding='utf8')
@@ -528,7 +529,7 @@ class groundTelemetry( MAVAbstract ):
         self._seq += 1.0
 
     def sendHeartbeat( self ):
-        msg = pymavlink.MAVLink_heartbeat_message(self._seqHB, 0, 0, 0, 0, 0)
+        msg = pymavlink.MAVLink_heartbeat_message(self._seqHB, self._satcount, 0, 0, 0, 0)
         self.queueOutputMsg(msg)
 
         self._seqHB += 1
@@ -540,26 +541,16 @@ class groundTelemetry( MAVAbstract ):
         msg = pymavlink.MAVLink_statustext_message( pymavlink.MAV_SEVERITY_ERROR, text_byte )
         self.queueOutputMsg(msg)
 
-    def updateLocation(self, id, lon, lat, letter, confidence, stdev, numpts):
-        if id >= self._numClusters:
-            return
+    def updateClusters(self, newClusters):
+        self._clusters = newClusters
 
-        letter_byte = bytearray(letter, encoding='utf8')
-
-        self._geolocChar[id] = letter_byte[0]
-        self._geolocConf[id] = confidence
-        self._geolocLat[id] = lat
-        self._geolocLon[id] = lon
-        self._geolocStd[id] = stdev
-        self._geolocNumPts[id] = numpts
-
-    def sendClusterMsg(self):
-        for i in range(self._numClusters):
+    def printClusters(self):
+        for i in range(len(self._clusters)):
+            # lat lon std confidence letter len
             msg = pymavlink.MAVLink_command_long_message(0, 0,
-                                                         pymavlink.MAV_CMD_WAYPOINT_USER_1,
-                                                         self._geolocChar[i],
-                                                         self._geolocConf[i], i, self._geolocStd[i], self._geolocNumPts[i],
-                                                         self._geolocLon[i], self._geolocLat[i], 0)
+                                                         pymavlink.MAV_CMD_WAYPOINT_USER_1, 0, i, self._clusters[i, 0],
+                                                         self._clusters[i, 1], self._clusters[i, 2], self._clusters[i, 3],
+                                                         self._clusters[i, 4], self._clusters[i, 5])
             self.queueOutputMsg(msg)
 
 

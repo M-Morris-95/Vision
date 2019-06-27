@@ -34,7 +34,7 @@ frozen_graph = freeze_graph(session.graph, session, [out.op.name for out in mode
 input_names = ['conv2d_1_input']
 output_names = ['dense_2/Softmax']
 
-
+# file names
 #['conv2d_1_input'] ['dense_2/Softmax']
 
 trt_graph = trt.create_inference_graph(
@@ -46,6 +46,6 @@ trt_graph = trt.create_inference_graph(
     minimum_segment_size=50
 )
 
-
+# write graph
 graph_io.write_graph(trt_graph, "./model/",
                      "new_graph.pb", as_text=False)

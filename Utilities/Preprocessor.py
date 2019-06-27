@@ -47,8 +47,8 @@ def preprocess(frame):
         # abs((rect[1][0]/rect[1][1])-1)<0.15 and
         if min(rect[1]) > 10:
             box_pts = np.int0(cv2.boxPoints(rect))
-            cv2.drawContours(frame, [box_pts], -1, (0, 255, 0), 2)
             image = rot_crop(frame, rect, box_pts, size, size)
+            cv2.drawContours(frame, [box_pts], -1, (0, 255, 0), 2)
             flag = 1
             break
 

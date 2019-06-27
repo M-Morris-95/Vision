@@ -48,4 +48,4 @@ trt_graph = trt.create_inference_graph(
 
 
 graph_io.write_graph(trt_graph, "./model/",
-                     "new_graph.pb", as_text=False)
+                     "graph-17-06.pb", as_text=False)

@@ -26,7 +26,7 @@ classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
 WIDTH = 28
 HEIGHT = 28
 NUM_CLASSES = 36
-EPOCHS = 50
+EPOCHS = 12
 ROOT_PATH = os.getcwd()
 #IMAGES_PATH = 'C:\\Users\\admin\\Documents\\Uni\\vision\\MyCode'
 os.chdir(ROOT_PATH+'/tensors')

@@ -1,4 +1,4 @@
-Vision System for the TBD 2019 aircraft Caelus 
+IMechE UAS Challenge Vision System for the TBD 2019 aircraft Caelus. 
 ![TBD_Caelus](TBD_Caelus.jpg)
 
 The first successful vision system at the IMechE UAS Challenge which uses OpenCV, TensorFlow and pymavlink to detect, classify, geolocate targets and then transmit results in real time from an unmanned aircraft. 
